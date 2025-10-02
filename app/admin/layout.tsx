@@ -15,7 +15,11 @@ import {
   SidebarInset,
   SidebarRail,
   SidebarTrigger,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { BookOpen, Users, GraduationCap, CalendarDays, LayoutGrid } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -33,27 +37,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <Link href="/admin">Overview</Link>
+                    <Link href="/admin"><LayoutGrid /> <span>Overview</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <Link href="/admin/courses">Courses</Link>
+                    <Link href="/admin/courses"><BookOpen /> <span>Courses</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <Link href="/admin/teachers">Teachers</Link>
+                    <Link href="/admin/teachers"><Users /> <span>Teachers</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <Link href="/admin/students">Students</Link>
+                    <Link href="/admin/students"><GraduationCap /> <span>Students</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <Link href="/admin/sessions">Sessions</Link>
+                    <Link href="/admin/sessions"><CalendarDays /> <span>Sessions</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -62,6 +66,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <SidebarSeparator />
         </SidebarContent>
         <SidebarRail />
+        <SidebarFooter>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 rounded-md p-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground w-full text-left">
+                <Avatar className="size-6">
+                  <AvatarImage src="" />
+                  <AvatarFallback>AD</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 truncate text-left">
+                  <div className="text-sm font-medium truncate">Admin</div>
+                  <div className="text-xs text-muted-foreground truncate">admin@example.com</div>
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <a href="/">Profile</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href="/">Settings</a>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <form action="/api/auth/sign-out" method="POST"><button type="submit" className="w-full text-left">Sign out</button></form>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <div className="border-b h-12 flex items-center gap-2 px-3">
