@@ -50,6 +50,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL(redirectTo, req.url));
   }
 
+  // Shared dashboard routes protected for any role
+  if (pathname.startsWith("/(dashboard)")) {
+    return NextResponse.next();
+  }
+
   return NextResponse.next();
 }
 
