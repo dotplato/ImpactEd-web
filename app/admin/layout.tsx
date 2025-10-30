@@ -20,6 +20,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { BookOpen, Users, GraduationCap, CalendarDays, LayoutGrid } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -34,6 +35,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <SidebarGroup>
             <SidebarGroupLabel>Navigation</SidebarGroupLabel>
             <SidebarGroupContent>
+              {/* Create Button Above Courses */}
+              <div className="mb-2 px-2">
+                <Button asChild className="w-full" variant="default">
+                  <Link href="/admin/courses/new">Create</Link>
+                </Button>
+              </div>
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>

@@ -6,7 +6,9 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { LayoutGrid, CalendarDays, Plus, Pencil, Trash } from 'lucide-react';
+import { LayoutGrid, CalendarDays, Plus, Pencil, Trash, LogIn, Clock } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { StatusTag } from "../ui/status-tag";
 
 type Role = "admin" | "teacher" | "student";
 
@@ -40,6 +42,7 @@ export default function SessionsPage({ role }: Props) {
   });
   const [courses, setCourses] = useState<{ id: string; title: string }[]>([]);
   const [enrolledStudents, setEnrolledStudents] = useState<{id: string, name: string, email: string}[]>([]);
+  const [courseIdToStudents, setCourseIdToStudents] = useState<Record<string, {id: string, name: string, email: string}[]>>({});
   const canCreate = role === "admin" || role === "teacher";
 
   // Additional state for editing
@@ -51,6 +54,50 @@ export default function SessionsPage({ role }: Props) {
   const [deleteId, setDeleteId] = useState<string|null>(null);
 
   const now = useMemo(() => new Date(), [sessions.length]);
+
+  // Compute session groups for Overview tab
+  const { todaySessions, upcomingSessions, pastSessions } = useMemo(() => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const t: SessionRow[] = [];
+    const u: SessionRow[] = [];
+    const p: SessionRow[] = [];
+
+    for (const s of sessions) {
+      const d = new Date(s.scheduled_at);
+      if (d >= startOfToday && d <= endOfToday) {
+        t.push(s);
+      } else if (d > endOfToday) {
+        u.push(s);
+      } else {
+        p.push(s);
+      }
+    }
+
+    t.sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+    u.sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+    p.sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
+
+    return { todaySessions: t, upcomingSessions: u, pastSessions: p };
+  }, [sessions]);
+
+  function formatTime(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function getDisplayedStatus(session: SessionRow) {
+    if (String(session.status).toLowerCase() === 'cancelled') return 'Cancelled';
+    const start = new Date(session.scheduled_at);
+    const end = new Date(start);
+    end.setMinutes(end.getMinutes() + (session.duration_minutes || 60));
+    if (now < start) return 'Upcoming';
+    if (now > end) return 'Completed';
+    return 'Ongoing';
+  }
 
   async function loadSessions() {
     setLoading(true);
@@ -66,32 +113,62 @@ export default function SessionsPage({ role }: Props) {
     setLoading(false);
   }
 
-  async function loadCourses() {
+  async function preloadCoursesAndStudents() {
     if (!canCreate) return;
     const res = await fetch("/api/admin/courses", { method: "GET" });
-    if (res.ok) {
-      const payload = await res.json();
-      const list = payload?.courses ?? payload ?? [];
-      const mapped = Array.isArray(list)
-        ? list.map((c: any) => ({ id: c.id, title: c.title }))
-        : [];
-      setCourses(mapped);
-    }
+    if (!res.ok) return;
+    const payload = await res.json();
+    const list = payload?.courses ?? payload ?? [];
+    const mapped: { id: string; title: string }[] = Array.isArray(list)
+      ? list.map((c: any) => ({ id: c.id, title: c.title }))
+      : [];
+    setCourses(mapped);
+
+    // Preload students for each course in parallel
+    const studentsEntries: [string, {id:string,name:string,email:string}[]][] = await Promise.all(
+      mapped.map(async (course) => {
+        try {
+          const r = await fetch(`/api/admin/courses/${course.id}/students`, { method: "GET" });
+          if (!r.ok) return [course.id, []] as [string, {id:string,name:string,email:string}[]];
+          const p = await r.json();
+          return [course.id, (p.students || []) as {id:string,name:string,email:string}[]] as [string, {id:string,name:string,email:string}[]];
+        } catch {
+          return [course.id, []] as [string, {id:string,name:string,email:string}[]];
+        }
+      })
+    );
+
+    const map: Record<string, {id: string, name: string, email: string}[]> = {};
+    for (const [cid, arr] of studentsEntries) map[cid] = arr;
+    setCourseIdToStudents(map);
   }
 
   // Load students for selected course when opening the form OR changing course
   async function loadStudentsForCourse(courseId: string) {
     if (!courseId) return setEnrolledStudents([]);
-    const res = await fetch(`/api/admin/courses/${courseId}/students`, { method: "GET" });
-    if (res.ok) {
-      const payload = await res.json();
-      setEnrolledStudents(payload.students || []);
+    // Use preloaded map if available
+    const preloaded = courseIdToStudents[courseId];
+    if (preloaded) {
+      setEnrolledStudents(preloaded);
+      return;
+    }
+    // Fallback fetch if not present (should rarely happen)
+    try {
+      const res = await fetch(`/api/admin/courses/${courseId}/students`, { method: "GET" });
+      if (res.ok) {
+        const payload = await res.json();
+        const list = payload.students || [];
+        setEnrolledStudents(list);
+        setCourseIdToStudents((m) => ({ ...m, [courseId]: list }));
+      }
+    } catch {
+      // ignore
     }
   }
 
   useEffect(() => {
     loadSessions();
-    loadCourses();
+    preloadCoursesAndStudents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -220,7 +297,6 @@ export default function SessionsPage({ role }: Props) {
         title: editForm.title,
         scheduledAt: editForm.scheduledAt,
         durationMinutes: Number(editForm.duration),
-        studentIds: editForm.selectedStudents, // Assuming editForm.selectedStudents is available here
       })
     });
     setEditLoading(false);
@@ -243,13 +319,72 @@ export default function SessionsPage({ role }: Props) {
         out += error.formErrors.join(' ');
       }
       if (error.fieldErrors && typeof error.fieldErrors === 'object') {
-        const flat = Object.entries(error.fieldErrors).flatMap(([field, arr]) => arr && arr.length ? `${field}: ${arr.join(' ')}` : []);
+        const entries = Object.entries(error.fieldErrors as Record<string, unknown>);
+        const flat = entries.flatMap(([field, arr]) => Array.isArray(arr) && arr.length ? `${field}: ${(arr as string[]).join(' ')}` : []);
         if (flat.length > 0) out += (out ? ' | ' : '') + flat.join(' | ');
       }
       if (!out) out = JSON.stringify(error);
       return out;
     }
     return String(error);
+  }
+
+  function renderStatusBadge(status: string) {
+    const normalized = status.toLowerCase();
+    if (normalized === 'cancelled') {
+      return <StatusTag color="red">Cancelled</StatusTag> 
+    }
+    if (normalized === 'completed') {
+      return <StatusTag color="green">Completed</StatusTag> 
+    }
+    if (normalized === 'upcoming') {
+      return <StatusTag color="blue">Upcoming</StatusTag> 
+    }
+      return <StatusTag color="amber">Ongoing</StatusTag> 
+  }
+
+  function renderActions(s: SessionRow, canJoin: boolean) {
+    return (
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onJoin(s.id)}
+          disabled={!canJoin}
+          className={`rounded px-3 py-1 text-sm inline-flex items-center gap-1 ${canJoin ? 'bg-black text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+          title={canJoin ? 'Join session' : 'Available at start time'}
+        >
+          <LogIn className="size-4" />
+          Join
+        </button>
+        {canEditOrDelete(s) && (
+          <>
+            <button
+              onClick={() => onEditStart(s)}
+              className="rounded-full bg-gray-100 hover:bg-blue-100 focus-visible:ring-2 focus-visible:ring-blue-300 p-1"
+              disabled={editId === s.id}
+              title="Edit"
+              aria-label="Edit"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 32, width: 32 }}
+            >
+              <Pencil className="size-4 text-blue-600" />
+            </button>
+            <button
+              onClick={() => onDelete(s.id)}
+              className="rounded-full bg-gray-100 hover:bg-red-100 focus-visible:ring-2 focus-visible:ring-red-300 p-1 ml-1"
+              disabled={deleteId === s.id}
+              title="Delete"
+              aria-label="Delete"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 32, width: 32 }}
+            >
+              {deleteId === s.id ? (
+                <span className="size-4 animate-spin border-2 border-gray-400 border-t-transparent rounded-full block" />
+              ) : (
+                <Trash className="size-4 text-red-600" />
+              )}
+            </button>
+          </>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -318,7 +453,13 @@ export default function SessionsPage({ role }: Props) {
                   onChange={async (e) => {
                     const val = e.target.value;
                     setForm(f => ({ ...f, courseId: val, selectedStudents: [] }));
-                    await loadStudentsForCourse(val);
+                    // Use preloaded students immediately
+                    const pre = courseIdToStudents[val] || [];
+                    setEnrolledStudents(pre);
+                    // Also trigger a fetch to ensure freshness if not preloaded
+                    if (!courseIdToStudents[val]) {
+                      await loadStudentsForCourse(val);
+                    }
                   }}
                 >
                   <option value="">Select course</option>
@@ -413,124 +554,96 @@ export default function SessionsPage({ role }: Props) {
       </Dialog.Root>
 
       {error && <p className="text-red-600 text-sm">{formatError(error)}</p>}
-      {/* Session list -- shown in both tabs as needed */}
-      {((activeTab === 'overview') || (activeTab === 'calendar')) && (
+
+      {activeTab === 'overview' && (
         loading ? (
           <div className="text-sm text-muted-foreground">Loading…</div>
         ) : (
-          <div className="border rounded">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left border-b">
-                  <th className="p-3">Title</th>
-                  <th className="p-3">Course</th>
-                  <th className="p-3">When</th>
-                  <th className="p-3">Duration</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Students</th>
-                  <th className="p-3">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sessions.map((s) => {
-                  // Edit modal (one at a time)
-                  if(editId === s.id) {
+          <div className="space-y-8">
+            {/* Today */}
+            <div>
+              <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Today</div>
+              {todaySessions.length ? (
+                <ul className="divide-y border rounded">
+                  {todaySessions.map((s) => {
+                    const startsAt = new Date(s.scheduled_at);
+                    const canJoinNow = now >= startsAt;
+                    const status = getDisplayedStatus(s);
                     return (
-                      <>
-                      <tr key={s.id} className="border-b last:border-b-0 bg-blue-50">
-                        <td colSpan={7} className="!p-0">
-                          <Dialog.Root open={!!editId} onOpenChange={open => { if(!open) onEditCancel() }}>
-                            <Dialog.Portal>
-                              <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40" />
-                              <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-w-md w-full -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-lg ring-1 ring-black/10 focus:outline-none">
-                                <Dialog.Title className="text-lg font-semibold mb-2">Edit Session</Dialog.Title>
-                                <form onSubmit={e=>{ e.preventDefault(); onEditSave();}} className="grid gap-3">
-                                  <div>
-                                    <label className="block text-sm mb-1">Title</label>
-                                    <input className="w-full border rounded px-3 py-2" value={editForm.title} onChange={e=>setEditForm(f=>({...f,title:e.target.value}))} />
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm mb-1">Start time</label>
-                                    <input type="datetime-local" className="w-full border rounded px-3 py-2" value={editForm.scheduledAt} onChange={e=>setEditForm(f=>({...f,scheduledAt:e.target.value}))}/>
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm mb-1">Duration (minutes)</label>
-                                    <input type="number" min={1} className="w-full border rounded px-3 py-2" value={editForm.duration} onChange={e=>setEditForm(f=>({...f,duration:Number(e.target.value)}))}/>
-                                  </div>
-                                  {/* Add enrolled student selection for edit here if desired */}
-                                  <div className="flex gap-2 justify-end">
-                                    <button type="button" className="rounded bg-gray-200 text-gray-900 px-4 py-2" onClick={() => onEditCancel()} disabled={editLoading}>Cancel</button>
-                                    <button disabled={editLoading} className="bg-green-600 text-white rounded px-4 py-2">{editLoading ? "Saving..." : "Save"}</button>
-                                  </div>
-                                </form>
-                              </Dialog.Content>
-                            </Dialog.Portal>
-                          </Dialog.Root>
-                        </td>
-                      </tr>
-                      </>
+                      <li key={s.id} className="flex items-center gap-4 p-3">
+                        <div className="w-24 text-sm font-medium text-gray-700 inline-flex items-center gap-2">
+                          <Clock className="size-4 text-gray-500" />
+                          {formatTime(s.scheduled_at)}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium">{s.title || 'Session'}</div>
+                          <div className="text-xs text-gray-500">{s.course?.title || '-'}</div>
+                        </div>
+                        <div className="text-xs text-gray-500 w-24">{s.duration_minutes} min</div>
+                        <div className="w-24 flex justify-end">{renderStatusBadge(status)}</div>
+                        <div>{renderActions(s, canJoinNow)}</div>
+                      </li>
                     );
-                  }
-                  const startsAt = new Date(s.scheduled_at);
-                  const canJoinNow = now >= startsAt;
-                  return (
-                    <tr key={s.id} className="border-b last:border-b-0">
-                      <td className="p-3">{s.title ?? "Session"}</td>
-                      <td className="p-3">{s.course?.title ?? "-"}</td>
-                      <td className="p-3">{new Date(s.scheduled_at).toLocaleString()}</td>
-                      <td className="p-3">{s.duration_minutes} min</td>
-                      <td className="p-3 capitalize">{s.status}</td>
-                      <td className="p-3">
-                        {/* Placeholder: to be populated with assigned students or a count */}
-                      </td>
-                      <td className="p-3 flex gap-2 items-center">
-                        <button
-                          onClick={() => onJoin(s.id)}
-                          disabled={!canJoinNow}
-                          className={`rounded px-3 py-1 text-sm ${canJoinNow ? "bg-black text-white" : "bg-gray-200 text-gray-500 cursor-not-allowed"}`}
-                          title={canJoinNow ? "Join session" : "Available at start time"}
-                        >
-                          Join
-                        </button>
-                        {canEditOrDelete(s) && (
-                          <>
-                            <button
-                              onClick={() => onEditStart(s)}
-                              className="rounded-full bg-gray-100 hover:bg-blue-100 focus-visible:ring-2 focus-visible:ring-blue-300 p-1"
-                              disabled={editId === s.id}
-                              title="Edit"
-                              aria-label="Edit"
-                              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 32, width: 32 }}
-                            >
-                              <Pencil className="size-4 text-blue-600" />
-                            </button>
-                            <button
-                              onClick={() => onDelete(s.id)}
-                              className="rounded-full bg-gray-100 hover:bg-red-100 focus-visible:ring-2 focus-visible:ring-red-300 p-1 ml-1"
-                              disabled={deleteId === s.id}
-                              title="Delete"
-                              aria-label="Delete"
-                              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 32, width: 32 }}
-                            >
-                              {deleteId === s.id ? (
-                                <span className="size-4 animate-spin border-2 border-gray-400 border-t-transparent rounded-full block" />
-                              ) : (
-                                <Trash className="size-4 text-red-600" />
-                              )}
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {!sessions.length && (
-                  <tr>
-                    <td className="p-3" colSpan={7}>No sessions</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  })}
+                </ul>
+              ) : (
+                <div className="text-sm text-muted-foreground">No sessions today</div>
+              )}
+            </div>
+
+            {/* Upcoming */}
+            <div>
+              <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Upcoming</div>
+              {upcomingSessions.length ? (
+                <ul className="divide-y border rounded">
+                  {upcomingSessions.map((s) => (
+                    <li key={s.id} className="flex items-center gap-4 p-3">
+                      <div className="w-24 text-sm font-medium text-gray-700 inline-flex items-center gap-2">
+                        <Clock className="size-4 text-gray-500" />
+                        {formatTime(s.scheduled_at)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">{s.title || 'Session'}</div>
+                        <div className="text-xs text-gray-500">{s.course?.title || '-'}</div>
+                      </div>
+                      <div className="text-xs text-gray-500 w-24">{new Date(s.scheduled_at).toLocaleDateString()}</div>
+                      <div className="text-xs text-gray-500 w-24">{s.duration_minutes} min</div>
+                      <div className="w-24 flex justify-end">{renderStatusBadge(getDisplayedStatus(s))}</div>
+                      <div>{renderActions(s, false)}</div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-sm text-muted-foreground">No upcoming sessions</div>
+              )}
+            </div>
+
+            {/* Past */}
+            <div>
+              <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Past</div>
+              {pastSessions.length ? (
+                <ul className="divide-y border rounded">
+                  {pastSessions.map((s) => (
+                    <li key={s.id} className="flex items-center gap-4 p-3">
+                      <div className="w-24 text-sm font-medium text-gray-700 inline-flex items-center gap-2">
+                        <Clock className="size-4 text-gray-500" />
+                        {formatTime(s.scheduled_at)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">{s.title || 'Session'}</div>
+                        <div className="text-xs text-gray-500">{s.course?.title || '-'}</div>
+                      </div>
+                      <div className="text-xs text-gray-500 w-24">{new Date(s.scheduled_at).toLocaleDateString()}</div>
+                      <div className="text-xs text-gray-500 w-24">{s.duration_minutes} min</div>
+                      <div className="w-24 flex justify-end">{renderStatusBadge(getDisplayedStatus(s))}</div>
+                      <div>{renderActions(s, false)}</div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-sm text-muted-foreground">No past sessions</div>
+              )}
+            </div>
           </div>
         )
       )}
