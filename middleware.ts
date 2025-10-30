@@ -9,7 +9,7 @@ export async function middleware(req: NextRequest) {
 
   if (!sessionToken) {
     // If unauthenticated and accessing protected routes, redirect to sign-in
-    if (pathname.startsWith("/admin") || pathname.startsWith("/teacher") || pathname.startsWith("/student") || pathname.startsWith("/dashboard")) {
+    if (pathname.startsWith("/admin") || pathname.startsWith("/teacher") || pathname.startsWith("/student")) {
       return NextResponse.redirect(new URL("/sign-in", req.url));
     }
     return NextResponse.next();
@@ -50,10 +50,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL(redirectTo, req.url));
   }
 
-  // Shared dashboard routes protected for any role
-  if (pathname.startsWith("/(dashboard)")) {
-    return NextResponse.next();
-  }
+  // No generic (dashboard) route; role-specific routes only
 
   return NextResponse.next();
 }
@@ -63,7 +60,7 @@ export const config = {
     "/admin/:path*",
     "/teacher/:path*",
     "/student/:path*",
-    "/(dashboard)/:path*",
+    
     "/sign-in",
     "/sign-up",
     "/(auth)/:path*",
