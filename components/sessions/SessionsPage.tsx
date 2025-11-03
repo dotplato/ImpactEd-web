@@ -7,7 +7,6 @@ import interactionPlugin from '@fullcalendar/interaction';
 import { useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { LayoutGrid, CalendarDays, Plus, Pencil, Trash, LogIn, Clock } from 'lucide-react';
-import { Badge } from "@/components/ui/badge";
 import { StatusTag } from "../ui/status-tag";
 
 type Role = "admin" | "teacher" | "student";
