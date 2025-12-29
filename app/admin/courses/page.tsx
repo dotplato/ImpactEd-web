@@ -89,7 +89,7 @@ export default function AdminCoursesPage() {
               </button>
             </div>
           </Dialog.Content>
-        </Dialog.Portal>
+        </Dialog.Portal> 
       </Dialog.Root>
     </div>
   );
