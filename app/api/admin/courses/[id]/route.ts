@@ -19,6 +19,29 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     if (cErr) throw new Error(cErr.message);
     if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    // For students, check if they're enrolled in this course
+    if (user.role === "student") {
+      const { data: student } = await supabase
+        .from("students")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const studentId = (student as any)?.id;
+      if (studentId) {
+        const { data: enrollment } = await supabase
+          .from("course_students")
+          .select("id")
+          .eq("course_id", courseId)
+          .eq("student_id", studentId)
+          .maybeSingle();
+        if (!enrollment) {
+          return NextResponse.json({ error: "Forbidden: Not enrolled in this course" }, { status: 403 });
+        }
+      } else {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     // Students
     const { data: students, error: sErr } = await supabase
       .from("course_students")

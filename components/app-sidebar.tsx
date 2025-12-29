@@ -36,27 +36,27 @@ const data = {
   navMain: [
     {
       title: "Overview",
-      url: "/admin",
+      url: "/",
       icon: IconHome,
     },
     {
       title: "Courses",
-      url: "/admin/courses",
+      url: "/courses",
       icon: IconBook,
     },
     {
       title: "Teachers",
-      url: "/admin/teachers",
+      url: "/teachers",
       icon: IconUsers,
     },
     {
       title: "Students",
-      url: "/admin/students",
+      url: "/students",
       icon: IconSchool,
     },
     {
       title: "Sessions",
-      url: "/admin/sessions",
+      url: "/sessions",
       icon: IconChalkboardTeacher,
     },
     {

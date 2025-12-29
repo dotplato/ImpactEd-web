@@ -4,11 +4,26 @@ import Link from "next/link";
 import * as Dialog from '@radix-ui/react-dialog';
 import { CourseCard } from "@/components/cards/CourseCard";
 
-export default function AdminCoursesPage() {
+type UserRole = "admin" | "teacher" | "student" | null;
+
+export default function CoursesPage() {
   const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editCourse, setEditCourse] = useState<any | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>(null);
+
+  useEffect(() => {
+    // Get current user role
+    fetch("/api/me")
+      .then(res => res.json())
+      .then(data => {
+        if (data.user) {
+          setUserRole(data.user.role);
+        }
+      })
+      .catch(() => setUserRole(null));
+  }, []);
 
   async function loadCourses() {
     setLoading(true);
@@ -25,8 +40,10 @@ export default function AdminCoursesPage() {
   }
 
   useEffect(() => {
-    loadCourses();
-  }, []);
+    if (userRole) {
+      loadCourses();
+    }
+  }, [userRole]);
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this course?')) return;
@@ -39,11 +56,16 @@ export default function AdminCoursesPage() {
     }
   }
 
+  const canCreate = userRole === "admin";
+  const canEdit = userRole === "admin";
+  const canDelete = userRole === "admin";
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Courses</h1>
-        <Link className="border rounded px-3 py-2 hover:bg-gray-50" href="/admin/courses/new">+ Create course</Link>
+        {canCreate && (
+          <Link className="border rounded px-3 py-2 hover:bg-gray-50" href="/courses/new">+ Create course</Link>
+        )}
       </div>
 
       {error && <div className="text-red-600 text-sm">{error}</div>}
@@ -66,8 +88,8 @@ export default function AdminCoursesPage() {
                 title={c.title}
                 teacherName={tUser?.name ?? null}
                 teacherEmail={tUser?.email ?? null}
-                onEdit={() => setEditCourse(c)}
-                onDelete={() => handleDelete(c.id)}
+                onEdit={canEdit ? () => setEditCourse(c) : undefined}
+                onDelete={canDelete ? () => handleDelete(c.id) : undefined}
               />
             );
           })}
@@ -94,5 +116,4 @@ export default function AdminCoursesPage() {
     </div>
   );
 }
-
 

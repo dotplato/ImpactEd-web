@@ -1,53 +1,83 @@
 "use client";
 
 import { Card } from "../ui/card";
+import Image from "next/image";
+import { TrendingUp } from "lucide-react";
 
-export function AdminDashboardKpis({ teachers, students, courses }: { teachers: number; students: number; courses: number }) {
+interface KpiCardProps {
+  title: string;
+  value: number;
+  iconSrc: string;
+  iconAlt: string;
+  trend?: number;
+}
+
+export function KpiCard({ title, value, iconSrc, iconAlt, trend }: KpiCardProps) {
+  return (
+    <Card className="p-4 flex flex-col gap-4">
+      <div className="flex flex-row justify-between items-start gap-4">
+        <div className="flex flex-col">
+          <h2 className="text-md text-muted-foreground">{title}</h2>
+          <div className="text-3xl font-semibold mt-1">{value}</div>
+        </div>
+        <span className="rounded-full p-3 flex-shrink-0 flex items-center justify-center">
+          <Image 
+            src={iconSrc} 
+            alt={iconAlt} 
+            width={90} 
+            height={90}
+            className="object-contain w-18 h-18"
+          />
+        </span>
+      </div>
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <TrendingUp className="w-4 h-4 text-green-600" />
+        <span className="text-green-600 font-medium">
+          {trend !== undefined ? `+${trend}%` : "+12.5%"}
+        </span>
+      </div>
+    </Card>
+  );
+}
+
+export function AdminDashboardKpis({ 
+  teachers, 
+  students, 
+  courses,
+  teacherTrend,
+  studentTrend,
+  courseTrend
+}: { 
+  teachers: number; 
+  students: number; 
+  courses: number;
+  teacherTrend?: number;
+  studentTrend?: number;
+  courseTrend?: number;
+}) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-
-      <Card className="p-4 flex  flex-row justify-between gap-4">
-        <div className="flex flex-col">
-          <div className="text-xs text-muted-foreground">Total Teachers</div>
-          <div className="text-2xl font-semibold mt-1">{teachers}</div>
-        </div>
-        <span className="rounded-full bg-indigo-100 p-2 flex-shrink-0">
-          {/* Teachers Icon */}
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="7" r="4" />
-            <path d="M5.5 21v-2A3.5 3.5 0 0 1 9 15.5h6A3.5 3.5 0 0 1 18.5 19v2" />
-          </svg>
-        </span>
-      </Card>
-
-      <Card className="p-4 flex  flex-row justify-between gap-4">
-        <div className="flex-1">
-          <div className="text-xs text-muted-foreground">Total Students</div>
-          <div className="text-2xl font-semibold mt-1">{students}</div>
-        </div>
-        <span className="rounded-full bg-green-100 p-2 flex-shrink-0">
-          {/* Students Icon */}
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="7" r="4" />
-            <path d="M4 21v-2A4 4 0 0 1 8 15h8a4 4 0 0 1 4 4v2" />
-          </svg>
-        </span>
-      </Card>
-
-      <Card className="p-4 flex  flex-row justify-between gap-4">
-        <div className="flex-1">
-          <div className="text-xs text-muted-foreground">Total Courses</div>
-          <div className="text-2xl font-semibold mt-1">{courses}</div>
-        </div>
-        <span className="rounded-full bg-yellow-100 p-2 flex-shrink-0">
-          {/* Courses Icon */}
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FACC15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="5" width="18" height="14" rx="2" />
-            <path d="M16 3v4M8 3v4" />
-            <path d="M3 9h18" />
-          </svg>
-        </span>
-      </Card>
+      <KpiCard
+        title="Total Teachers"
+        value={teachers}
+        iconSrc="/icons/teacher-brand-icon.png"
+        iconAlt="Teachers"
+        trend={teacherTrend}
+      />
+      <KpiCard
+        title="Total Students"
+        value={students}
+        iconSrc="/icons/student-brand-icon.png"
+        iconAlt="Students"
+        trend={studentTrend}
+      />
+      <KpiCard
+        title="Total Courses"
+        value={courses}
+        iconSrc="/icons/course-brand-icon.png"
+        iconAlt="Courses"
+        trend={courseTrend}
+      />
     </div>
   );
 }

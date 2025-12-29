@@ -31,7 +31,7 @@ export function CourseCard({ id, title, teacherName, teacherAvatarUrl, teacherEm
           <div className="flex items-center gap-2">
             <div className="size-9 rounded-md bg-muted flex items-center justify-center"><BookOpen className="size-5" /></div>
             <div>
-              <Link href={`/admin/courses/${id}`} className="font-medium hover:underline">
+              <Link href={`/courses/${id}`} className="font-medium hover:underline">
                 {title}
               </Link>
               <div className="text-xs text-muted-foreground">Course</div>

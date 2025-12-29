@@ -9,7 +9,11 @@ export async function middleware(req: NextRequest) {
 
   if (!sessionToken) {
     // If unauthenticated and accessing protected routes, redirect to sign-in
-    if (pathname.startsWith("/admin") || pathname.startsWith("/teacher") || pathname.startsWith("/student")) {
+    if (pathname === "/" || pathname.startsWith("/admin") || 
+        pathname.startsWith("/teacher/") || pathname === "/teacher" ||
+        pathname.startsWith("/student/") || pathname === "/student" ||
+        pathname.startsWith("/courses") || pathname.startsWith("/sessions") || 
+        pathname.startsWith("/teachers") || pathname.startsWith("/students")) {
       return NextResponse.redirect(new URL("/sign-in", req.url));
     }
     return NextResponse.next();
@@ -30,37 +34,40 @@ export async function middleware(req: NextRequest) {
 
   const role = (data.users as any).role as "admin" | "teacher" | "student";
 
-  // If authenticated user tries to access auth pages, send them to their role home
+  // If authenticated user tries to access auth pages, send them to dashboard
   if (pathname === "/sign-in" || pathname === "/sign-up" || pathname.startsWith("/(auth)")) {
-    const redirectTo = role === "admin" ? "/admin" : role === "teacher" ? "/teacher" : "/student";
-    return NextResponse.redirect(new URL(redirectTo, req.url));
+    return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // Role-based gates
-  if (pathname.startsWith("/admin") && role !== "admin") {
-    const redirectTo = role === "teacher" ? "/teacher" : "/student";
-    return NextResponse.redirect(new URL(redirectTo, req.url));
-  }
-  if (pathname.startsWith("/teacher") && role !== "teacher") {
-    const redirectTo = role === "admin" ? "/admin" : "/student";
-    return NextResponse.redirect(new URL(redirectTo, req.url));
-  }
-  if (pathname.startsWith("/student") && role !== "student") {
-    const redirectTo = role === "admin" ? "/admin" : "/teacher";
-    return NextResponse.redirect(new URL(redirectTo, req.url));
+  // Redirect old admin routes to root dashboard
+  if (pathname.startsWith("/admin")) {
+    return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // No generic (dashboard) route; role-specific routes only
+  // Role-based gates for old role-specific routes (redirect to dashboard)
+  // Only redirect singular /teacher and /student routes, not plural /teachers and /students
+  // Note: pathname.startsWith("/teacher/") will NOT match "/teachers" because "/teachers" doesn't start with "/teacher/"
+  if (pathname === "/teacher" || pathname.startsWith("/teacher/")) {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
+  if (pathname === "/student" || pathname.startsWith("/student/")) {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
 
+  // Allow all other routes including /teachers and /students to pass through
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
+    "/",
     "/admin/:path*",
     "/teacher/:path*",
     "/student/:path*",
-    
+    "/courses/:path*",
+    "/sessions/:path*",
+    "/teachers/:path*",
+    "/students/:path*",
     "/sign-in",
     "/sign-up",
     "/(auth)/:path*",

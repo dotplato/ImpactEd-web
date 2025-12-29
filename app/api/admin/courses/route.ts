@@ -45,11 +45,11 @@ export async function POST(req: Request) {
 // /api/admin/courses (list all courses)
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user || (user.role !== "admin" && user.role !== "teacher")) {
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const supabase = getSupabaseServerClient();
-  // Admin: all courses; Teacher: only their courses
+  // Admin: all courses; Teacher: only their courses; Student: only enrolled courses
   if (user.role === "admin") {
     const { data, error } = await supabase
       .from("courses")
@@ -58,21 +58,38 @@ export async function GET(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ courses: data ?? [] });
   }
-  // teacher: only their courses
-  const { data: teacher } = await supabase
-    .from("teachers")
+  if (user.role === "teacher") {
+    // teacher: only their courses
+    const { data: teacher } = await supabase
+      .from("teachers")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const teacherId = (teacher as any)?.id;
+    if (!teacherId) return NextResponse.json({ courses: [] });
+    const { data, error } = await supabase
+      .from("courses")
+      .select("id, title, teacher:teachers(id, user:users(name, email))")
+      .eq("teacher_id", teacherId)
+      .order("created_at", { ascending: false });
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ courses: data ?? [] });
+  }
+  // student: only enrolled courses
+  const { data: student } = await supabase
+    .from("students")
     .select("id")
     .eq("user_id", user.id)
     .maybeSingle();
-  const teacherId = (teacher as any)?.id;
-  if (!teacherId) return NextResponse.json({ courses: [] });
-  const { data, error } = await supabase
-    .from("courses")
-    .select("id, title, teacher:teachers(id, user:users(name, email))")
-    .eq("teacher_id", teacherId)
-    .order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ courses: data ?? [] });
+  const studentId = (student as any)?.id;
+  if (!studentId) return NextResponse.json({ courses: [] });
+  const { data: enrollments, error: eErr } = await supabase
+    .from("course_students")
+    .select("course:courses(id, title, teacher:teachers(id, user:users(name, email)))")
+    .eq("student_id", studentId);
+  if (eErr) return NextResponse.json({ error: eErr.message }, { status: 400 });
+  const courses = (enrollments ?? []).map((e: any) => e.course).filter(Boolean);
+  return NextResponse.json({ courses });
 }
 
 

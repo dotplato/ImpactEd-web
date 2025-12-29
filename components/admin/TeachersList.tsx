@@ -28,7 +28,7 @@ export function TeachersList({ teachers }: Props) {
         return (
           <Link
             key={t.id}
-            href={`/admin/teachers`}
+            href={`/teachers`}
             className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors border-b last:border-b-0"
           >
             <Avatar className="size-10">

@@ -3,8 +3,8 @@ import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer } from "
 
 export function GenderChart({ male, female }: { male: number; female: number }) {
   const chartData = [
-    { name: 'Male', value: male, fill: '#6366F1' },
-    { name: 'Female', value: female, fill: '#EC4899' },
+    { name: 'Male', value: male, fill: '#780698' },
+    { name: 'Female', value: female, fill: '#FF7300' },
   ];
   const maxVal = Math.max(male, female, 1);
 
@@ -30,12 +30,12 @@ export function GenderChart({ male, female }: { male: number; female: number }) 
       </div>
       <div className="flex flex-col gap-1 mt-2 w-full px-6">
         <div className="flex items-center gap-2">
-          <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#6366F1" }} />
+          <span className="inline-block h-2 w-2 rounded-full bg-secondary" />
           <span className="w-16">Male</span>
           <span className="text-muted-foreground">{male}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#EC4899" }} />
+          <span className="inline-block h-2 w-2 rounded-full bg-primary " />
           <span className="w-16">Female</span>
           <span className="text-muted-foreground">{female}</span>
         </div>

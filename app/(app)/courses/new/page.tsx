@@ -25,8 +25,24 @@ export default function NewCoursePage() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<"admin" | "teacher" | "student" | null>(null);
 
   useEffect(() => {
+    fetch("/api/me")
+      .then(res => res.json())
+      .then(data => {
+        if (data.user) {
+          setUserRole(data.user.role);
+          if (data.user.role !== "admin") {
+            router.push("/courses");
+          }
+        }
+      })
+      .catch(() => router.push("/courses"));
+  }, [router]);
+
+  useEffect(() => {
+    if (userRole !== "admin") return;
     (async () => {
       const res = await fetch("/api/admin/teachers");
       const data = await res.json();
@@ -37,7 +53,7 @@ export default function NewCoursePage() {
       const data = await res.json();
       if (res.ok) setStudents(data.students || []);
     })();
-  }, []);
+  }, [userRole]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,8 +70,12 @@ export default function NewCoursePage() {
       setError(data?.error || "Failed to create course");
       return;
     }
-    router.push(`/admin/courses/${data.id}`);
+    router.push(`/courses/${data.id}`);
   };
+
+  if (userRole !== "admin") {
+    return <div className="text-sm text-muted-foreground">Loading...</div>;
+  }
 
   return (
     <div className="max-w-lg">
@@ -172,5 +192,4 @@ export default function NewCoursePage() {
     </div>
   );
 }
-
 

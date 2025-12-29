@@ -28,7 +28,7 @@ type FileRow = {
   created_at: string;
 };
 
-export default function AdminCourseDetailPage() {
+export default function CourseDetailPage() {
   const params = useParams<{ id: string }>();
   const courseId = params?.id as string;
 
@@ -45,6 +45,8 @@ export default function AdminCourseDetailPage() {
   const [filesLoading, setFilesLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  const [userRole, setUserRole] = useState<"admin" | "teacher" | "student" | null>(null);
+
   // Create session form
   const [form, setForm] = useState({
     title: "",
@@ -54,6 +56,17 @@ export default function AdminCourseDetailPage() {
   });
 
   const studentOptions = useMemo(() => (course?.students ?? []).map(s => ({ id: s.id, label: `${s.name} (${s.email})` })), [course]);
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then(res => res.json())
+      .then(data => {
+        if (data.user) {
+          setUserRole(data.user.role);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function loadCourse() {
     setLoading(true);
@@ -167,6 +180,10 @@ export default function AdminCourseDetailPage() {
     if (res.ok) loadFiles();
   }
 
+  const canCreateSession = userRole === "admin" || userRole === "teacher";
+  const canUploadFiles = userRole === "admin" || userRole === "teacher";
+  const canDeleteFiles = userRole === "admin" || userRole === "teacher";
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -174,7 +191,7 @@ export default function AdminCourseDetailPage() {
           <h1 className="text-xl font-semibold">Course</h1>
           <div className="text-sm text-muted-foreground">{course?.title || ""}</div>
         </div>
-        <Link className="text-sm underline" href="/admin/courses">Back to courses</Link>
+        <Link className="text-sm underline" href="/courses">Back to courses</Link>
       </div>
 
       {error && <div className="text-red-600 text-sm">{error}</div>}
@@ -186,7 +203,9 @@ export default function AdminCourseDetailPage() {
             <div className="flex gap-2 border-b">
               <button className={`px-3 py-2 text-sm ${activeTab==='overview'?'border-b-2 border-foreground font-medium':''}`} onClick={()=>setActiveTab('overview')}>Overview</button>
               <button className={`px-3 py-2 text-sm ${activeTab==='schedule'?'border-b-2 border-foreground font-medium':''}`} onClick={()=>setActiveTab('schedule')}>Schedule</button>
-              <button className={`px-3 py-2 text-sm ${activeTab==='files'?'border-b-2 border-foreground font-medium':''}`} onClick={()=>setActiveTab('files')}>Files</button>
+              {canUploadFiles && (
+                <button className={`px-3 py-2 text-sm ${activeTab==='files'?'border-b-2 border-foreground font-medium':''}`} onClick={()=>setActiveTab('files')}>Files</button>
+              )}
             </div>
 
             {activeTab === "overview" && (
@@ -220,32 +239,34 @@ export default function AdminCourseDetailPage() {
 
             {activeTab === "schedule" && (
               <div className="space-y-6">
-                <form className="grid gap-3 md:grid-cols-4 items-end" onSubmit={onCreateSession}>
-                  <div className="md:col-span-1">
-                    <label className="block text-xs mb-1">Title</label>
-                    <input className="w-full border rounded px-2 py-1 text-sm" value={form.title} onChange={e=>setForm(f=>({...f, title:e.target.value}))} placeholder="Optional" />
-                  </div>
-                  <div className="md:col-span-1">
-                    <label className="block text-xs mb-1">When</label>
-                    <input type="datetime-local" className="w-full border rounded px-2 py-1 text-sm" value={form.scheduledAt} onChange={e=>setForm(f=>({...f, scheduledAt:e.target.value}))} required />
-                  </div>
-                  <div className="md:col-span-1">
-                    <label className="block text-xs mb-1">Duration (min)</label>
-                    <input type="number" min={1} className="w-full border rounded px-2 py-1 text-sm" value={form.duration} onChange={e=>setForm(f=>({...f, duration:Number(e.target.value)||60}))} />
-                  </div>
-                  <div className="md:col-span-1">
-                    <label className="block text-xs mb-1">Students</label>
-                    <select multiple className="w-full border rounded px-2 py-1 text-sm h-24" value={form.selectedStudents} onChange={e=>{
-                      const vals = Array.from(e.target.selectedOptions).map(o=>o.value);
-                      setForm(f=>({...f, selectedStudents: vals}));
-                    }}>
-                      {studentOptions.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="md:col-span-4">
-                    <button className="border rounded px-3 py-2 text-sm hover:bg-gray-50">Create session</button>
-                  </div>
-                </form>
+                {canCreateSession && (
+                  <form className="grid gap-3 md:grid-cols-4 items-end" onSubmit={onCreateSession}>
+                    <div className="md:col-span-1">
+                      <label className="block text-xs mb-1">Title</label>
+                      <input className="w-full border rounded px-2 py-1 text-sm" value={form.title} onChange={e=>setForm(f=>({...f, title:e.target.value}))} placeholder="Optional" />
+                    </div>
+                    <div className="md:col-span-1">
+                      <label className="block text-xs mb-1">When</label>
+                      <input type="datetime-local" className="w-full border rounded px-2 py-1 text-sm" value={form.scheduledAt} onChange={e=>setForm(f=>({...f, scheduledAt:e.target.value}))} required />
+                    </div>
+                    <div className="md:col-span-1">
+                      <label className="block text-xs mb-1">Duration (min)</label>
+                      <input type="number" min={1} className="w-full border rounded px-2 py-1 text-sm" value={form.duration} onChange={e=>setForm(f=>({...f, duration:Number(e.target.value)||60}))} />
+                    </div>
+                    <div className="md:col-span-1">
+                      <label className="block text-xs mb-1">Students</label>
+                      <select multiple className="w-full border rounded px-2 py-1 text-sm h-24" value={form.selectedStudents} onChange={e=>{
+                        const vals = Array.from(e.target.selectedOptions).map(o=>o.value);
+                        setForm(f=>({...f, selectedStudents: vals}));
+                      }}>
+                        {studentOptions.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="md:col-span-4">
+                      <button className="border rounded px-3 py-2 text-sm hover:bg-gray-50">Create session</button>
+                    </div>
+                  </form>
+                )}
 
                 <div className="space-y-6">
                   {sessionsLoading ? (
@@ -285,7 +306,7 @@ export default function AdminCourseDetailPage() {
               </div>
             )}
 
-            {activeTab === "files" && (
+            {activeTab === "files" && canUploadFiles && (
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <input type="file" onChange={onUploadFile} disabled={uploading} />
@@ -303,7 +324,9 @@ export default function AdminCourseDetailPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <a className="text-sm underline" href={f.file_path} target="_blank" rel="noreferrer">View</a>
-                          <button className="text-sm text-red-600" onClick={()=>onDeleteFile(f.id)}>Delete</button>
+                          {canDeleteFiles && (
+                            <button className="text-sm text-red-600" onClick={()=>onDeleteFile(f.id)}>Delete</button>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -331,5 +354,4 @@ export default function AdminCourseDetailPage() {
     </div>
   );
 }
-
 
