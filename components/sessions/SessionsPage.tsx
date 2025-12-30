@@ -1,10 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState, useRef } from "react";
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
+import { useEffect, useMemo, useState } from "react";
 import { LayoutGrid, CalendarDays, Plus, Pencil, Trash, LogIn, Clock, Loader2, Search, Check } from 'lucide-react';
+import { CalendarView } from "@/components/ui/calendar-view";
 import { cn } from "@/lib/utils";
 import {
   Tabs,
@@ -74,7 +71,6 @@ type Props = {
 };
 
 export default function SessionsPage({ role }: Props) {
-  const calendarRef = useRef<any>(null);
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -223,17 +219,20 @@ export default function SessionsPage({ role }: Props) {
   }, []);
 
   // Calendar event mapping
-  const calendarEvents = sessions.map(s => ({
-    id: s.id,
-    title: s.title || "Session",
-    start: s.scheduled_at,
-    end: (() => {
-      const d = new Date(s.scheduled_at);
-      d.setMinutes(d.getMinutes() + (s.duration_minutes || 60));
-      return d.toISOString();
-    })(),
-    extendedProps: s,
-  }));
+  const calendarEvents = sessions.map(s => {
+    const start = new Date(s.scheduled_at);
+    const end = new Date(start);
+    end.setMinutes(end.getMinutes() + (s.duration_minutes || 60));
+
+    return {
+      id: s.id,
+      title: s.title || "Session",
+      start,
+      end,
+      status: getDisplayedStatus(s).toLowerCase() as "upcoming" | "ongoing" | "completed" | "cancelled",
+      course: s.course?.title,
+    };
+  });
 
   // Helper to format JS date to YYYY-MM-DDTHH:MM for HTML input
   function toLocalDatetimeInputValue(date: Date) {
@@ -241,31 +240,22 @@ export default function SessionsPage({ role }: Props) {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
-  const handleDateClick = (info: { date: Date; dateStr: string }) => {
+  const handleDateClick = (date: Date) => {
     if (!(role === 'admin' || role === 'teacher')) return;
-    // info.date is JS Date
-    const dtStr = toLocalDatetimeInputValue(info.date instanceof Date ? info.date : new Date(info.dateStr));
+    const dtStr = toLocalDatetimeInputValue(date);
     setForm((f: typeof form) => ({ ...f, scheduledAt: dtStr }));
     setCreateOpen(true);
   };
 
-  // For drag-select (range) on week/day views
-  const handleSelect = (info: { start: Date; startStr: string }) => {
-    if (!(role === 'admin' || role === 'teacher')) return;
-    // info.start is Date
-    const dtStr = toLocalDatetimeInputValue(info.start instanceof Date ? info.start : new Date(info.startStr));
-    setForm((f: typeof form) => ({ ...f, scheduledAt: dtStr }));
-    setCreateOpen(true);
-  };
-
-  const handleEventClick = (info: any) => {
-    // Optionally start editing; for now, scroll table to it
-    if (canEditOrDelete(info.event.extendedProps)) {
-      setEditId(info.event.id);
+  const handleEventClick = (event: any) => {
+    // Find the session from the event ID
+    const session = sessions.find(s => s.id === event.id);
+    if (session && canEditOrDelete(session)) {
+      setEditId(session.id);
       setEditForm({
-        title: info.event.title || "",
-        scheduledAt: info.event.startStr.slice(0, 16),
-        duration: info.event.extendedProps.duration_minutes || 60
+        title: session.title || "",
+        scheduledAt: session.scheduled_at.slice(0, 16),
+        duration: session.duration_minutes || 60
       });
     }
   };
@@ -678,27 +668,11 @@ export default function SessionsPage({ role }: Props) {
         </div>
 
         <TabsContent value="calendar" className="mt-6">
-          <Card>
-            <CardContent className="p-4">
-              <FullCalendar
-                ref={calendarRef}
-                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                initialView="dayGridMonth"
-                headerToolbar={{
-                  left: 'prev,next today',
-                  center: 'title',
-                  right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                }}
-                height="auto"
-                events={calendarEvents}
-                eventClick={handleEventClick}
-                dateClick={handleDateClick}
-                selectable={role === 'admin' || role === 'teacher'}
-                select={handleSelect}
-                nowIndicator={true}
-              />
-            </CardContent>
-          </Card>
+          <CalendarView
+            events={calendarEvents}
+            onDateClick={handleDateClick}
+            onEventClick={handleEventClick}
+          />
         </TabsContent>
 
         <TabsContent value="overview" className="mt-6 space-y-8">
