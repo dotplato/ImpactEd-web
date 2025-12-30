@@ -1,13 +1,55 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { useRef } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { LayoutGrid, CalendarDays, Plus, Pencil, Trash, LogIn, Clock } from 'lucide-react';
-import { StatusTag } from "../ui/status-tag";
+import { LayoutGrid, CalendarDays, Plus, Pencil, Trash, LogIn, Clock, Loader2, Search, Check } from 'lucide-react';
+import { cn } from "@/lib/utils";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar";
 
 type Role = "admin" | "teacher" | "student";
 
@@ -20,13 +62,20 @@ type SessionRow = {
   course?: { id: string; title: string } | null;
 };
 
+type Student = {
+  id: string;
+  name: string;
+  email: string;
+  image_url?: string | null;
+};
+
 type Props = {
   role: Role;
 };
 
 export default function SessionsPage({ role }: Props) {
   const calendarRef = useRef<any>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'calendar'>('overview');
+  const [activeTab, setActiveTab] = useState<string>('overview');
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,17 +89,19 @@ export default function SessionsPage({ role }: Props) {
     selectedStudents: [] as string[],
   });
   const [courses, setCourses] = useState<{ id: string; title: string }[]>([]);
-  const [enrolledStudents, setEnrolledStudents] = useState<{id: string, name: string, email: string}[]>([]);
-  const [courseIdToStudents, setCourseIdToStudents] = useState<Record<string, {id: string, name: string, email: string}[]>>({});
+  const [enrolledStudents, setEnrolledStudents] = useState<Student[]>([]);
+  const [courseIdToStudents, setCourseIdToStudents] = useState<Record<string, Student[]>>({});
+  const [studentSearch, setStudentSearch] = useState("");
+  const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
   const canCreate = role === "admin" || role === "teacher";
 
   // Additional state for editing
-  const [editId, setEditId] = useState<string|null>(null);
-  const [editForm, setEditForm] = useState<{title:string, scheduledAt:string, duration:number}>({title:"", scheduledAt:"", duration:60});
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ title: string, scheduledAt: string, duration: number }>({ title: "", scheduledAt: "", duration: 60 });
   const [editLoading, setEditLoading] = useState(false);
 
   // Track session we are deleting
-  const [deleteId, setDeleteId] = useState<string|null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const now = useMemo(() => new Date(), [sessions.length]);
 
@@ -124,20 +175,20 @@ export default function SessionsPage({ role }: Props) {
     setCourses(mapped);
 
     // Preload students for each course in parallel
-    const studentsEntries: [string, {id:string,name:string,email:string}[]][] = await Promise.all(
+    const studentsEntries: [string, { id: string, name: string, email: string }[]][] = await Promise.all(
       mapped.map(async (course) => {
         try {
           const r = await fetch(`/api/admin/courses/${course.id}/students`, { method: "GET" });
-          if (!r.ok) return [course.id, []] as [string, {id:string,name:string,email:string}[]];
+          if (!r.ok) return [course.id, []] as [string, { id: string, name: string, email: string }[]];
           const p = await r.json();
-          return [course.id, (p.students || []) as {id:string,name:string,email:string}[]] as [string, {id:string,name:string,email:string}[]];
+          return [course.id, (p.students || []) as { id: string, name: string, email: string }[]] as [string, { id: string, name: string, email: string }[]];
         } catch {
-          return [course.id, []] as [string, {id:string,name:string,email:string}[]];
+          return [course.id, []] as [string, { id: string, name: string, email: string }[]];
         }
       })
     );
 
-    const map: Record<string, {id: string, name: string, email: string}[]> = {};
+    const map: Record<string, { id: string, name: string, email: string }[]> = {};
     for (const [cid, arr] of studentsEntries) map[cid] = arr;
     setCourseIdToStudents(map);
   }
@@ -158,7 +209,7 @@ export default function SessionsPage({ role }: Props) {
         const payload = await res.json();
         const list = payload.students || [];
         setEnrolledStudents(list);
-        setCourseIdToStudents((m) => ({ ...m, [courseId]: list }));
+        setCourseIdToStudents((m: Record<string, { id: string, name: string, email: string }[]>) => ({ ...m, [courseId]: list }));
       }
     } catch {
       // ignore
@@ -190,30 +241,30 @@ export default function SessionsPage({ role }: Props) {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
-  const handleDateClick = (info: any) => {
+  const handleDateClick = (info: { date: Date; dateStr: string }) => {
     if (!(role === 'admin' || role === 'teacher')) return;
     // info.date is JS Date
     const dtStr = toLocalDatetimeInputValue(info.date instanceof Date ? info.date : new Date(info.dateStr));
-    setForm(f => ({ ...f, scheduledAt: dtStr }));
+    setForm((f: typeof form) => ({ ...f, scheduledAt: dtStr }));
     setCreateOpen(true);
   };
 
   // For drag-select (range) on week/day views
-  const handleSelect = (info: any) => {
+  const handleSelect = (info: { start: Date; startStr: string }) => {
     if (!(role === 'admin' || role === 'teacher')) return;
     // info.start is Date
     const dtStr = toLocalDatetimeInputValue(info.start instanceof Date ? info.start : new Date(info.startStr));
-    setForm(f => ({ ...f, scheduledAt: dtStr }));
+    setForm((f: typeof form) => ({ ...f, scheduledAt: dtStr }));
     setCreateOpen(true);
   };
 
   const handleEventClick = (info: any) => {
     // Optionally start editing; for now, scroll table to it
-    if(canEditOrDelete(info.event.extendedProps)) {
+    if (canEditOrDelete(info.event.extendedProps)) {
       setEditId(info.event.id);
       setEditForm({
         title: info.event.title || "",
-        scheduledAt: info.event.startStr.slice(0,16),
+        scheduledAt: info.event.startStr.slice(0, 16),
         duration: info.event.extendedProps.duration_minutes || 60
       });
     }
@@ -281,7 +332,7 @@ export default function SessionsPage({ role }: Props) {
 
   const onEditStart = (session: SessionRow) => {
     setEditId(session.id);
-    setEditForm({ title: session.title || "", scheduledAt: session.scheduled_at.slice(0,16), duration: session.duration_minutes });
+    setEditForm({ title: session.title || "", scheduledAt: session.scheduled_at.slice(0, 16), duration: session.duration_minutes });
   };
   const onEditCancel = () => {
     setEditId(null);
@@ -291,7 +342,7 @@ export default function SessionsPage({ role }: Props) {
     setError(null);
     const res = await fetch(`/api/sessions/${editId}`, {
       method: "PATCH",
-      headers: {"Content-Type":"application/json"},
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: editForm.title,
         scheduledAt: editForm.scheduledAt,
@@ -331,55 +382,57 @@ export default function SessionsPage({ role }: Props) {
   function renderStatusBadge(status: string) {
     const normalized = status.toLowerCase();
     if (normalized === 'cancelled') {
-      return <StatusTag color="red">Cancelled</StatusTag> 
+      return <Badge variant="destructive">Cancelled</Badge>
     }
     if (normalized === 'completed') {
-      return <StatusTag color="green">Completed</StatusTag> 
+      return <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">Completed</Badge>
     }
     if (normalized === 'upcoming') {
-      return <StatusTag color="blue">Upcoming</StatusTag> 
+      return <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100">Upcoming</Badge>
     }
-      return <StatusTag color="amber">Ongoing</StatusTag> 
+    return <Badge variant="secondary" className="bg-amber-100 text-amber-800 hover:bg-amber-100">Ongoing</Badge>
   }
 
   function renderActions(s: SessionRow, canJoin: boolean) {
     return (
       <div className="flex items-center gap-2">
-        <button
+        <Button
           onClick={() => onJoin(s.id)}
           disabled={!canJoin}
-          className={`rounded px-3 py-1 text-sm inline-flex items-center gap-1 ${canJoin ? 'bg-black text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+          size="sm"
+          variant={canJoin ? "default" : "outline"}
+          className="gap-1"
           title={canJoin ? 'Join session' : 'Available at start time'}
         >
           <LogIn className="size-4" />
           Join
-        </button>
+        </Button>
         {canEditOrDelete(s) && (
           <>
-            <button
+            <Button
               onClick={() => onEditStart(s)}
-              className="rounded-full bg-gray-100 hover:bg-blue-100 focus-visible:ring-2 focus-visible:ring-blue-300 p-1"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
               disabled={editId === s.id}
               title="Edit"
-              aria-label="Edit"
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 32, width: 32 }}
             >
-              <Pencil className="size-4 text-blue-600" />
-            </button>
-            <button
+              <Pencil className="size-4" />
+            </Button>
+            <Button
               onClick={() => onDelete(s.id)}
-              className="rounded-full bg-gray-100 hover:bg-red-100 focus-visible:ring-2 focus-visible:ring-red-300 p-1 ml-1"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
               disabled={deleteId === s.id}
               title="Delete"
-              aria-label="Delete"
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 32, width: 32 }}
             >
               {deleteId === s.id ? (
-                <span className="size-4 animate-spin border-2 border-gray-400 border-t-transparent rounded-full block" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <Trash className="size-4 text-red-600" />
+                <Trash className="size-4" />
               )}
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -387,265 +440,496 @@ export default function SessionsPage({ role }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Tab bar and New Session button */}
-      <div className="flex items-center border-b mb-4">
-        <div className="flex gap-0">
-          <button
-            className={`px-4 py-2 font-medium border-b-2 transition-colors duration-100 flex items-center gap-1 ${activeTab === 'overview' ? 'border-black text-black' : 'border-transparent text-gray-500 hover:text-black'}`}
-            onClick={() => setActiveTab('overview')}
-          >
-            <LayoutGrid className="size-4" /> Overview
-          </button>
-          <button
-            className={`px-4 py-2 font-medium border-b-2 transition-colors duration-100 flex items-center gap-1 ${activeTab === 'calendar' ? 'border-black text-black' : 'border-transparent text-gray-500 hover:text-black'}`}
-            onClick={() => setActiveTab('calendar')}
-          >
-            <CalendarDays className="size-4" /> Calendar
-          </button>
-        </div>
-        <div className="flex-1" />
-        {(role === 'admin' || role === 'teacher') && (
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="ml-auto bg-black text-white rounded px-4 py-2 text-sm shadow hover:bg-gray-900 transition flex items-center gap-1"
-          >
-            <Plus className="size-4" /> New Session
-          </button>
-        )}
-      </div>
+    <div className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="flex items-center justify-between mb-4">
+          <TabsList>
+            <TabsTrigger value="overview" className="gap-2">
+              <LayoutGrid className="size-4" /> Overview
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="gap-2">
+              <CalendarDays className="size-4" /> Calendar
+            </TabsTrigger>
+          </TabsList>
 
-      {activeTab === 'calendar' && (
-        <div className="border rounded mb-4">
-          <FullCalendar
-            ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay'
-            }}
-            height="auto"
-            events={calendarEvents}
-            eventClick={handleEventClick}
-            dateClick={handleDateClick}
-            selectable={role === 'admin' || role === 'teacher'}
-            select={handleSelect}
-            nowIndicator={true}
-          />
-        </div>
-      )}
+          {(role === 'admin' || role === 'teacher') && (
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button variant="secondary" size="sm" className="gap-1">
+                  <Plus className="size-4" /> New Session
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Create Session</DialogTitle>
+                  <DialogDescription>
+                    Schedule a new learning session for your students.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={onCreate} className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="course">Course</Label>
+                    <Select
+                      value={form.courseId}
+                      onValueChange={async (val: string) => {
+                        setForm(f => ({ ...f, courseId: val, selectedStudents: [] }));
+                        const pre = courseIdToStudents[val] || [];
+                        setEnrolledStudents(pre);
+                        if (!courseIdToStudents[val]) {
+                          await loadStudentsForCourse(val);
+                        }
+                      }}
+                    >
+                      <SelectTrigger id="course">
+                        <SelectValue placeholder="Select course" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {courses.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-      <Dialog.Root open={!!createOpen} onOpenChange={open => { setCreateOpen(open); if(!open) setEnrolledStudents([]); }}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-w-md w-full -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-lg ring-1 ring-black/10 focus:outline-none">
-            <Dialog.Title className="text-lg font-semibold mb-2">Create Session</Dialog.Title>
-            <form onSubmit={onCreate} className="grid gap-3">
-              <div>
-                <label className="block text-sm mb-1">Course</label>
-                <select
-                  required
-                  className="w-full border rounded px-3 py-2"
-                  value={form.courseId}
-                  onChange={async (e) => {
-                    const val = e.target.value;
-                    setForm(f => ({ ...f, courseId: val, selectedStudents: [] }));
-                    // Use preloaded students immediately
-                    const pre = courseIdToStudents[val] || [];
-                    setEnrolledStudents(pre);
-                    // Also trigger a fetch to ensure freshness if not preloaded
-                    if (!courseIdToStudents[val]) {
-                      await loadStudentsForCourse(val);
-                    }
-                  }}
-                >
-                  <option value="">Select course</option>
-                  {courses.map((c) => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
-                  ))}
-                </select>
-              </div>
-              {form.courseId && (
-                <div>
-                  <label className="block text-sm mb-1">Students</label>
-                  {enrolledStudents.length > 0 ? (
-                    <div className="border rounded p-2 flex flex-col gap-1 max-h-40 overflow-y-auto">
-                      <label className="flex items-center gap-2 font-medium">
-                        <input
-                          type="checkbox"
-                          checked={form.selectedStudents.length === enrolledStudents.length}
-                          onChange={e =>
-                            setForm(f => ({
-                              ...f,
-                              selectedStudents: e.target.checked
-                                ? enrolledStudents.map(s => s.id)
-                                : [],
-                            }))
-                          }
-                        />
-                        Select All
-                      </label>
-                      {enrolledStudents.map(s => (
-                        <label key={s.id} className="flex items-center gap-2 pl-4">
-                          <input
-                            type="checkbox"
-                            value={s.id}
-                            checked={form.selectedStudents.includes(s.id)}
-                            onChange={e => {
-                              const checked = e.target.checked;
-                              setForm(f => ({
-                                ...f,
-                                selectedStudents: checked
-                                  ? [...f.selectedStudents, s.id]
-                                  : f.selectedStudents.filter(id => id !== s.id),
-                              }));
-                            }}
-                          />
-                          {s.name} <span className="text-xs text-gray-400">({s.email})</span>
-                        </label>
-                      ))}
+                  {form.courseId && (
+                    <div className="grid gap-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Students</Label>
+                        <div className="flex items-center gap-2">
+                          <div className="flex -space-x-2 overflow-hidden">
+                            {form.selectedStudents.slice(0, 5).map(id => {
+                              const student = enrolledStudents.find(s => s.id === id);
+                              if (!student) return null;
+                              return (
+                                <Avatar key={id} className="size-7 border-2 border-background">
+                                  <AvatarImage src={student.image_url || undefined} />
+                                  <AvatarFallback className="text-[10px]">{student.name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                              );
+                            })}
+                            {form.selectedStudents.length > 5 && (
+                              <div className="flex size-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-medium">
+                                +{form.selectedStudents.length - 5}
+                              </div>
+                            )}
+                          </div>
+                          <Dialog open={selectionDialogOpen} onOpenChange={setSelectionDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="size-8 rounded-full border-primary text-primary hover:bg-primary/10"
+                              >
+                                <Plus className="size-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden gap-0">
+                              <DialogHeader className="p-6 pb-2">
+                                <DialogTitle>Select Students</DialogTitle>
+                                <DialogDescription>
+                                  Invite students to this session. This will create a group session.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="p-4 pt-2 border-b">
+                                <div className="relative">
+                                  <Search className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
+                                  <Input
+                                    placeholder="Search students..."
+                                    className="pl-8 h-9 bg-background"
+                                    value={studentSearch}
+                                    onChange={(e) => setStudentSearch(e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                              <div className="h-80 overflow-y-auto">
+                                <div className="divide-y">
+                                  <div
+                                    className="flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                                    onClick={() => {
+                                      const allSelected = form.selectedStudents.length === enrolledStudents.length;
+                                      setForm((f: typeof form) => ({
+                                        ...f,
+                                        selectedStudents: allSelected ? [] : enrolledStudents.map(s => s.id),
+                                      }));
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                        <Check className={cn("size-4 text-primary transition-opacity", form.selectedStudents.length === enrolledStudents.length ? "opacity-100" : "opacity-0")} />
+                                      </div>
+                                      <span className="font-medium">Select All</span>
+                                    </div>
+                                    <Checkbox
+                                      checked={form.selectedStudents.length === enrolledStudents.length}
+                                      className="pointer-events-none"
+                                    />
+                                  </div>
+                                  {enrolledStudents
+                                    .filter(s =>
+                                      s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                                      s.email.toLowerCase().includes(studentSearch.toLowerCase())
+                                    )
+                                    .map(s => {
+                                      const isSelected = form.selectedStudents.includes(s.id);
+                                      return (
+                                        <div
+                                          key={s.id}
+                                          className={cn(
+                                            "flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer transition-colors",
+                                            isSelected && "bg-primary/5"
+                                          )}
+                                          onClick={() => {
+                                            setForm((f: typeof form) => ({
+                                              ...f,
+                                              selectedStudents: isSelected
+                                                ? f.selectedStudents.filter(id => id !== s.id)
+                                                : [...f.selectedStudents, s.id],
+                                            }));
+                                          }}
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <Avatar className="size-8">
+                                              <AvatarImage src={s.image_url || undefined} />
+                                              <AvatarFallback>{s.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            <div className="flex flex-col">
+                                              <span className="text-sm font-medium">{s.name}</span>
+                                              <span className="text-xs text-muted-foreground">{s.email}</span>
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            {isSelected && <Check className="size-4 text-primary" />}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                </div>
+                              </div>
+                              <div className="p-4 border-t bg-muted/10 flex items-center justify-between gap-4">
+                                <div className="flex -space-x-2 overflow-hidden no-scrollbar">
+                                  {form.selectedStudents.map(id => {
+                                    const student = enrolledStudents.find(s => s.id === id);
+                                    if (!student) return null;
+                                    return (
+                                      <Avatar key={id} className="size-8 border-2 border-background">
+                                        <AvatarImage src={student.image_url || undefined} />
+                                        <AvatarFallback className="text-xs">{student.name.charAt(0)}</AvatarFallback>
+                                      </Avatar>
+                                    );
+                                  })}
+                                </div>
+                                <Button
+                                  type="button"
+                                  className="bg-purple-700 hover:bg-purple-800 text-white px-8"
+                                  onClick={() => setSelectionDialogOpen(false)}
+                                >
+                                  Continue
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="text-xs text-gray-400 italic pl-1">No students enrolled.</div>
                   )}
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="title">Title (Optional)</Label>
+                    <Input
+                      id="title"
+                      value={form.title}
+                      onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                      placeholder="Session title"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="start">Start Time</Label>
+                      <Input
+                        id="start"
+                        type="datetime-local"
+                        required
+                        value={form.scheduledAt}
+                        onChange={(e) => setForm((f) => ({ ...f, scheduledAt: e.target.value }))}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="duration">Duration (min)</Label>
+                      <Input
+                        id="duration"
+                        type="number"
+                        min={1}
+                        value={form.duration}
+                        onChange={(e) => setForm((f) => ({ ...f, duration: Number(e.target.value) }))}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" disabled={form.selectedStudents.length === 0}>
+                      Create Session
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+
+        <TabsContent value="calendar" className="mt-6">
+          <Card>
+            <CardContent className="p-4">
+              <FullCalendar
+                ref={calendarRef}
+                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                initialView="dayGridMonth"
+                headerToolbar={{
+                  left: 'prev,next today',
+                  center: 'title',
+                  right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                }}
+                height="auto"
+                events={calendarEvents}
+                eventClick={handleEventClick}
+                dateClick={handleDateClick}
+                selectable={role === 'admin' || role === 'teacher'}
+                select={handleSelect}
+                nowIndicator={true}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="overview" className="mt-6 space-y-8">
+          {error && (
+            <Badge variant="destructive" className="w-full justify-center py-2 text-sm">
+              {formatError(error)}
+            </Badge>
+          )}
+
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="size-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              {/* Today */}
+              <section className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider font-bold">Today</Badge>
+                  <div className="h-px flex-1 bg-border" />
                 </div>
-              )}
-              <div>
-                <label className="block text-sm mb-1">Title</label>
-                <input
-                  className="w-full border rounded px-3 py-2"
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="Optional"
-                />
-              </div>
-              <div>
-                <label className="block text-sm mb-1">Start time</label>
-                <input
+                {todaySessions.length ? (
+                  <Card className="px-2">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[120px]">Time</TableHead>
+                          <TableHead>Session</TableHead>
+                          <TableHead className="hidden md:table-cell">Duration</TableHead>
+                          <TableHead className="text-right">Status</TableHead>
+                          <TableHead className="w-[100px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {todaySessions.map((s) => {
+                          const startsAt = new Date(s.scheduled_at);
+                          const canJoinNow = now >= startsAt;
+                          const status = getDisplayedStatus(s);
+                          return (
+                            <TableRow key={s.id}>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="size-3.5 text-muted-foreground" />
+                                  {formatTime(s.scheduled_at)}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="font-semibold">{s.title || 'Session'}</div>
+                                <div className="text-xs text-muted-foreground">{s.course?.title || '-'}</div>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell text-muted-foreground">
+                                {s.duration_minutes} min
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {renderStatusBadge(status)}
+                              </TableCell>
+                              <TableCell>
+                                {renderActions(s, canJoinNow)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </Card>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg border-dashed">No sessions scheduled for today.</p>
+                )}
+              </section>
+
+              {/* Upcoming */}
+              <section className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider font-bold">Upcoming</Badge>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                {upcomingSessions.length ? (
+                  <Card className="px-2">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[120px]">Time</TableHead>
+                          <TableHead>Session</TableHead>
+                          <TableHead className="hidden md:table-cell">Date</TableHead>
+                          <TableHead className="hidden md:table-cell">Duration</TableHead>
+                          <TableHead className="text-right">Status</TableHead>
+                          <TableHead className="w-[100px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {upcomingSessions.map((s) => (
+                          <TableRow key={s.id}>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Clock className="size-3.5 text-muted-foreground" />
+                                {formatTime(s.scheduled_at)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-semibold">{s.title || 'Session'}</div>
+                              <div className="text-xs text-muted-foreground">{s.course?.title || '-'}</div>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell text-muted-foreground">
+                              {new Date(s.scheduled_at).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell text-muted-foreground">
+                              {s.duration_minutes} min
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {renderStatusBadge(getDisplayedStatus(s))}
+                            </TableCell>
+                            <TableCell>
+                              {renderActions(s, false)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Card>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg border-dashed">No upcoming sessions.</p>
+                )}
+              </section>
+
+              {/* Past */}
+              <section className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider font-bold">Past</Badge>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                {pastSessions.length ? (
+                  <Card className="px-2">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[120px]">Time</TableHead>
+                          <TableHead>Session</TableHead>
+                          <TableHead className="hidden md:table-cell">Date</TableHead>
+                          <TableHead className="hidden md:table-cell">Duration</TableHead>
+                          <TableHead className="text-right">Status</TableHead>
+                          <TableHead className="w-[100px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pastSessions.map((s) => (
+                          <TableRow key={s.id}>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Clock className="size-3.5 text-muted-foreground" />
+                                {formatTime(s.scheduled_at)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-semibold">{s.title || 'Session'}</div>
+                              <div className="text-xs text-muted-foreground">{s.course?.title || '-'}</div>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell text-muted-foreground">
+                              {new Date(s.scheduled_at).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell text-muted-foreground">
+                              {s.duration_minutes} min
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {renderStatusBadge(getDisplayedStatus(s))}
+                            </TableCell>
+                            <TableCell>
+                              {renderActions(s, false)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Card>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg border-dashed">No past sessions.</p>
+                )}
+              </section>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editId} onOpenChange={(open) => !open && setEditId(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Session</DialogTitle>
+            <DialogDescription>
+              Update the session details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={editForm.title}
+                onChange={(e) => setEditForm((f: typeof editForm) => ({ ...f, title: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-start">Start Time</Label>
+                <Input
+                  id="edit-start"
                   type="datetime-local"
-                  required
-                  className="w-full border rounded px-3 py-2"
-                  value={form.scheduledAt}
-                  onChange={(e) => setForm((f) => ({ ...f, scheduledAt: e.target.value }))}
+                  value={editForm.scheduledAt}
+                  onChange={(e) => setEditForm((f: typeof editForm) => ({ ...f, scheduledAt: e.target.value }))}
                 />
               </div>
-              <div>
-                <label className="block text-sm mb-1">Duration (minutes)</label>
-                <input
+              <div className="grid gap-2">
+                <Label htmlFor="edit-duration">Duration (min)</Label>
+                <Input
+                  id="edit-duration"
                   type="number"
                   min={1}
-                  className="w-full border rounded px-3 py-2"
-                  value={form.duration}
-                  onChange={(e) => setForm((f) => ({ ...f, duration: Number(e.target.value) }))}
+                  value={editForm.duration}
+                  onChange={(e) => setEditForm((f: typeof editForm) => ({ ...f, duration: Number(e.target.value) }))}
                 />
               </div>
-              <div className="flex gap-2 justify-end">
-                <button type="button" className="rounded bg-gray-200 text-gray-900 px-4 py-2" onClick={() => setCreateOpen(false)}>Cancel</button>
-                <button className="bg-black text-white rounded px-4 py-2" disabled={form.selectedStudents.length === 0} title={form.selectedStudents.length ? '' : 'Select at least one student'}>
-                  Create session
-                </button>
-              </div>
-            </form>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      {error && <p className="text-red-600 text-sm">{formatError(error)}</p>}
-
-      {activeTab === 'overview' && (
-        loading ? (
-          <div className="text-sm text-muted-foreground">Loading…</div>
-        ) : (
-          <div className="space-y-8">
-            {/* Today */}
-            <div>
-              <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Today</div>
-              {todaySessions.length ? (
-                <ul className="divide-y border rounded">
-                  {todaySessions.map((s) => {
-                    const startsAt = new Date(s.scheduled_at);
-                    const canJoinNow = now >= startsAt;
-                    const status = getDisplayedStatus(s);
-                    return (
-                      <li key={s.id} className="flex items-center gap-4 p-3">
-                        <div className="w-24 text-sm font-medium text-gray-700 inline-flex items-center gap-2">
-                          <Clock className="size-4 text-gray-500" />
-                          {formatTime(s.scheduled_at)}
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium">{s.title || 'Session'}</div>
-                          <div className="text-xs text-gray-500">{s.course?.title || '-'}</div>
-                        </div>
-                        <div className="text-xs text-gray-500 w-24">{s.duration_minutes} min</div>
-                        <div className="w-24 flex justify-end">{renderStatusBadge(status)}</div>
-                        <div>{renderActions(s, canJoinNow)}</div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <div className="text-sm text-muted-foreground">No sessions today</div>
-              )}
-            </div>
-
-            {/* Upcoming */}
-            <div>
-              <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Upcoming</div>
-              {upcomingSessions.length ? (
-                <ul className="divide-y border rounded">
-                  {upcomingSessions.map((s) => (
-                    <li key={s.id} className="flex items-center gap-4 p-3">
-                      <div className="w-24 text-sm font-medium text-gray-700 inline-flex items-center gap-2">
-                        <Clock className="size-4 text-gray-500" />
-                        {formatTime(s.scheduled_at)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{s.title || 'Session'}</div>
-                        <div className="text-xs text-gray-500">{s.course?.title || '-'}</div>
-                      </div>
-                      <div className="text-xs text-gray-500 w-24">{new Date(s.scheduled_at).toLocaleDateString()}</div>
-                      <div className="text-xs text-gray-500 w-24">{s.duration_minutes} min</div>
-                      <div className="w-24 flex justify-end">{renderStatusBadge(getDisplayedStatus(s))}</div>
-                      <div>{renderActions(s, false)}</div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-sm text-muted-foreground">No upcoming sessions</div>
-              )}
-            </div>
-
-            {/* Past */}
-            <div>
-              <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Past</div>
-              {pastSessions.length ? (
-                <ul className="divide-y border rounded">
-                  {pastSessions.map((s) => (
-                    <li key={s.id} className="flex items-center gap-4 p-3">
-                      <div className="w-24 text-sm font-medium text-gray-700 inline-flex items-center gap-2">
-                        <Clock className="size-4 text-gray-500" />
-                        {formatTime(s.scheduled_at)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{s.title || 'Session'}</div>
-                        <div className="text-xs text-gray-500">{s.course?.title || '-'}</div>
-                      </div>
-                      <div className="text-xs text-gray-500 w-24">{new Date(s.scheduled_at).toLocaleDateString()}</div>
-                      <div className="text-xs text-gray-500 w-24">{s.duration_minutes} min</div>
-                      <div className="w-24 flex justify-end">{renderStatusBadge(getDisplayedStatus(s))}</div>
-                      <div>{renderActions(s, false)}</div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-sm text-muted-foreground">No past sessions</div>
-              )}
             </div>
           </div>
-        )
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={onEditCancel}>Cancel</Button>
+            <Button onClick={onEditSave} disabled={editLoading}>
+              {editLoading ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
