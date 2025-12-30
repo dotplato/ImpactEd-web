@@ -13,9 +13,10 @@ import {
   IconBook,
   IconPlane,
   IconMessage,
+  IconFiles,
 } from "@tabler/icons-react"
 
-import { NavDocuments } from "@/components/nav-documents"
+import { AppUser } from "@/lib/auth/session"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
@@ -29,13 +30,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  navMain: [
+const getNavData = (userRole: AppUser["role"] | null) => {
+  const allNavItems = [
     {
       title: "Overview",
       url: "/",
@@ -47,65 +43,87 @@ const data = {
       icon: IconBook,
     },
     {
+      title: "Sessions",
+      url: "/sessions",
+      icon: IconChalkboardTeacher,
+    },
+    {
+      title: "Assignments",
+      url: "/assignments",
+      icon: IconFiles,
+    },
+    {
       title: "Teachers",
       url: "/teachers",
       icon: IconUsers,
+      roles: ["admin", "student"] as const, // Only show to admin and students
     },
     {
       title: "Students",
       url: "/students",
       icon: IconSchool,
-    },
-    {
-      title: "Sessions",
-      url: "/sessions",
-      icon: IconChalkboardTeacher,
+      roles: ["admin", "teacher"] as const, // Only show to admin and teachers
     },
     {
       title: "Announcements",
       url: "/announcements",
       icon: IconSpeakerphone
     },
-  ],
+  ];
 
-  navSecondary: [
-    {
-      title: "Messages",
-      url: "/messages",
-      icon: IconMessage,
+  // Filter nav items based on user role
+  const filteredNavItems = allNavItems.filter(item => {
+    if (!item.roles) return true; // Show items without role restrictions to everyone
+    if (!userRole) return false; // Hide role-restricted items if no user role
+    return (item.roles as readonly AppUser["role"][]).includes(userRole);
+  });
+
+  return {
+    user: {
+      name: "shadcn",
+      email: "m@example.com",
+      avatar: "/avatars/shadcn.jpg",
     },
-    {
-      title: "Settings",
-      url: "#",
-      icon: IconSettings,
-    },
-    {
-      title: "Get Help",
-      url: "#",
-      icon: IconHelp,
-    },
-  ],
-  // documents: [
-  //   {
-  //     name: "Data Library",
-  //     url: "#",
-  //     icon: IconDatabase,
-  //   },
-  //   {
-  //     name: "Reports",
-  //     url: "#",
-  //     icon: IconReport,
-  //   },
-  //   {
-  //     name: "Word Assistant",
-  //     url: "#",
-  //     icon: IconFileWord,
-  //   },
-  // ],
+    navMain: filteredNavItems,
+    navSecondary: [
+      {
+        title: "Messages",
+        url: "/messages",
+        icon: IconMessage,
+      },
+      {
+        title: "Settings",
+        url: "#",
+        icon: IconSettings,
+      },
+      {
+        title: "Get Help",
+        url: "#",
+        icon: IconHelp,
+      },
+    ],
+  };
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [unreadCount, setUnreadCount] = React.useState(0);
+  const [userRole, setUserRole] = React.useState<AppUser["role"] | null>(null);
+
+  React.useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const response = await fetch("/api/me");
+        const data = await response.json();
+        if (data.user) {
+          setUserRole(data.user.role);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user role:", error);
+      }
+    };
+
+    fetchUserRole();
+  }, []);
 
   React.useEffect(() => {
     const fetchUnread = async () => {
@@ -126,6 +144,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const interval = setInterval(fetchUnread, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const data = getNavData(userRole);
 
   const navSecondaryWithBadge = data.navSecondary.map(item => {
     if (item.title === "Messages" && unreadCount > 0) {
