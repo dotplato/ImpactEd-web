@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -393,8 +393,9 @@ export function CalendarView({ events, onDateClick, onEventClick, className }: C
                             variant="default"
                             size="sm"
                             onClick={goToToday}
-                            className="h-9"
+                            className="h-9 gap-1.5"
                         >
+                            <CalendarDays className="size-4" />
                             Today
                         </Button>
                         <Button
