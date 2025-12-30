@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Conversation, Message } from "@/lib/actions/chat";
+import { Conversation, Message, ensureGroupConversation } from "@/lib/actions/chat";
 import { ConversationList } from "./conversation-list";
 import { ChatWindow } from "./chat-window";
 import { AppUser } from "@/lib/auth/session";
-import { createClient } from "@supabase/supabase-js";
 import { Loader2 } from "lucide-react";
 import { supabaseClient } from "@/lib/db/supabase-client";
+import { useRouter } from "next/navigation";
 
 interface ChatLayoutProps {
     initialConversations: Conversation[];
@@ -19,6 +19,7 @@ export function ChatLayout({ initialConversations, currentUser, potentialPartner
     const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
+    const router = useRouter();
 
     // Sync state with props when server revalidates
     useEffect(() => {
@@ -26,6 +27,37 @@ export function ChatLayout({ initialConversations, currentUser, potentialPartner
     }, [initialConversations]);
 
     const selectedConversation = conversations.find(c => c.id === selectedConversationId);
+
+    const handleSelect = async (id: string) => {
+        let finalId = id;
+
+        // If it's a placeholder, ensure the conversation exists
+        if (id.startsWith("course:")) {
+            const courseId = id.split(":")[1];
+            try {
+                finalId = await ensureGroupConversation(courseId);
+                // Update the conversation in the list so it's no longer a placeholder
+                setConversations(prev => prev.map(c => {
+                    if (c.id === id) {
+                        return { ...c, id: finalId };
+                    }
+                    return c;
+                }));
+            } catch (error) {
+                console.error("Failed to ensure group conversation:", error);
+                return;
+            }
+        }
+
+        setSelectedConversationId(finalId);
+        // Optimistically mark as read
+        setConversations(prev => prev.map(c => {
+            if (c.id === finalId) {
+                return { ...c, unread_count: 0 };
+            }
+            return c;
+        }));
+    };
 
     // Realtime subscription
     useEffect(() => {
@@ -45,15 +77,8 @@ export function ChatLayout({ initialConversations, currentUser, potentialPartner
                     setConversations(prev => {
                         const updated = prev.map(conv => {
                             if (conv.id === newMessage.conversation_id) {
-                                // If this is the currently selected conversation, we assume it's being read?
-                                // Actually, ChatLayout doesn't know if the window is focused or if user is active.
-                                // But if it IS selected, the ChatWindow will likely mark it as read.
-                                // However, for the LIST, we might want to show it as unread until that happens?
-                                // Or if it's selected, we don't increment?
                                 const isSelected = conv.id === selectedConversationId;
 
-                                // Only increment if NOT selected (or maybe even if selected, let ChatWindow clear it?)
-                                // Let's increment if not selected.
                                 const newUnreadCount = isSelected
                                     ? (conv.unread_count || 0)
                                     : (conv.unread_count || 0) + 1;
@@ -90,16 +115,7 @@ export function ChatLayout({ initialConversations, currentUser, potentialPartner
                 <ConversationList
                     conversations={conversations}
                     selectedId={selectedConversationId}
-                    onSelect={(id) => {
-                        setSelectedConversationId(id);
-                        // Optimistically mark as read
-                        setConversations(prev => prev.map(c => {
-                            if (c.id === id) {
-                                return { ...c, unread_count: 0 };
-                            }
-                            return c;
-                        }));
-                    }}
+                    onSelect={handleSelect}
                     currentUser={currentUser}
                     potentialPartners={potentialPartners}
                 />

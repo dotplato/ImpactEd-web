@@ -39,6 +39,20 @@ export async function POST(req: Request) {
     const { error: csErr } = await supabase.from("course_students").insert(links);
     if (csErr) return NextResponse.json({ error: csErr.message }, { status: 400 });
   }
+
+  // Initialize group conversation
+  const { error: convErr } = await supabase
+    .from("conversations")
+    .insert({
+      type: "group",
+      course_id: data.id
+    });
+
+  if (convErr) {
+    console.error("Error initializing group conversation:", convErr);
+    // We don't fail the whole request if just the chat fails, but it's good to log
+  }
+
   return NextResponse.json({ id: data.id });
 }
 

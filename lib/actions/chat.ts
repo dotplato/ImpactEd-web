@@ -28,7 +28,6 @@ export type Message = {
     attachments?: { url: string; name: string; type: string; size: number }[];
 };
 
-// ... (UserParticipant type)
 export type UserParticipant = {
     id: string;
     name: string;
@@ -37,9 +36,6 @@ export type UserParticipant = {
 };
 
 export async function getConversations(): Promise<Conversation[]> {
-    // ... (no change needed here as long as we don't need attachments in conversation preview yet)
-    // Actually, we might want to show "Attachment" in preview if content is empty?
-    // Let's leave it for now.
     const user = await getCurrentUser();
     if (!user) return [];
 
@@ -66,7 +62,6 @@ export async function getConversations(): Promise<Conversation[]> {
 
     const formattedDirectConvos = directConvos.map((item: any) => {
         const conv = item.conversation;
-        // Filter out self from participants for display
         const otherParticipants = conv.participants
             .map((p: any) => p.user)
             .filter((u: any) => u.id !== user.id);
@@ -78,14 +73,12 @@ export async function getConversations(): Promise<Conversation[]> {
     });
 
     // 2. Get Course Group Conversations
-    let courseIds: string[] = [];
+    let courses: { id: string, title: string }[] = [];
 
     if (user.role === "admin") {
-        // Admin sees all courses
-        const { data: courses } = await supabase.from("courses").select("id");
-        courseIds = courses?.map((c: any) => c.id) || [];
+        const { data } = await supabase.from("courses").select("id, title");
+        courses = data || [];
     } else if (user.role === "teacher") {
-        // Teacher sees courses they teach
         const { data: teacher } = await supabase
             .from("teachers")
             .select("id")
@@ -93,14 +86,13 @@ export async function getConversations(): Promise<Conversation[]> {
             .maybeSingle();
 
         if (teacher) {
-            const { data: courses } = await supabase
+            const { data } = await supabase
                 .from("courses")
-                .select("id")
+                .select("id, title")
                 .eq("teacher_id", teacher.id);
-            courseIds = courses?.map((c: any) => c.id) || [];
+            courses = data || [];
         }
     } else if (user.role === "student") {
-        // Student sees courses they are enrolled in
         const { data: student } = await supabase
             .from("students")
             .select("id")
@@ -110,31 +102,57 @@ export async function getConversations(): Promise<Conversation[]> {
         if (student) {
             const { data: enrollments } = await supabase
                 .from("course_students")
-                .select("course_id")
+                .select("course:courses(id, title)")
                 .eq("student_id", student.id);
-            courseIds = enrollments?.map((e: any) => e.course_id) || [];
+            courses = (enrollments || []).map((e: any) => e.course).filter(Boolean);
         }
     }
 
-    // Fetch existing group conversations
-    const { data: groupConvos, error: groupError } = await supabase
-        .from("conversations")
-        .select(`
-      id, type, course_id, created_at, updated_at,
-      course:courses(title)
-    `)
-        .eq("type", "group")
-        .in("course_id", courseIds);
+    const courseIds = courses.map(c => c.id);
 
-    if (groupError) {
-        console.error("Error fetching group conversations:", groupError);
+    // Fetch existing group conversations
+    let groupConvos: any[] = [];
+    if (courseIds.length > 0) {
+        const { data, error: groupError } = await supabase
+            .from("conversations")
+            .select(`
+          id, type, course_id, created_at, updated_at,
+          course:courses(title)
+        `)
+            .eq("type", "group")
+            .in("course_id", courseIds);
+
+        if (groupError) {
+            console.error("Error fetching group conversations:", groupError);
+        } else {
+            groupConvos = data || [];
+        }
+
+        // Add placeholders for missing conversations instead of auto-creating here
+        const existingCourseIds = new Set(groupConvos.map(c => c.course_id));
+        const missingCourses = courses.filter(c => !existingCourseIds.has(c.id));
+
+        for (const course of missingCourses) {
+            groupConvos.push({
+                id: `course:${course.id}`, // Placeholder ID
+                type: "group",
+                course_id: course.id,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                course: { title: course.title },
+                last_message: null,
+                unread_count: 0
+            });
+        }
     }
 
     // Combine and sort
-    const allConvos = [...formattedDirectConvos, ...(groupConvos || [])];
+    const allConvos = [...formattedDirectConvos, ...groupConvos];
 
     // Fetch last message and calculate unread count for each conversation
     for (const conv of allConvos) {
+        if (conv.id.startsWith("course:")) continue; // Skip placeholders
+
         try {
             const { data: lastMsg } = await supabase
                 .from("messages")
@@ -142,10 +160,9 @@ export async function getConversations(): Promise<Conversation[]> {
                 .eq("conversation_id", conv.id)
                 .order("created_at", { ascending: false })
                 .limit(1)
-                .maybeSingle(); // Use maybeSingle to avoid error if no messages
+                .maybeSingle();
             conv.last_message = lastMsg;
 
-            // Get user's last read time
             const { data: participant } = await supabase
                 .from("conversation_participants")
                 .select("last_read_at")
@@ -155,7 +172,6 @@ export async function getConversations(): Promise<Conversation[]> {
 
             const lastReadAt = participant?.last_read_at || new Date(0).toISOString();
 
-            // Count unread messages
             const { count } = await supabase
                 .from("messages")
                 .select("id", { count: "exact", head: true })
@@ -170,14 +186,21 @@ export async function getConversations(): Promise<Conversation[]> {
         }
     }
 
+    // Deduplicate by ID to prevent React "duplicate key" warnings
+    const uniqueConvosMap = new Map<string, Conversation>();
+    for (const conv of allConvos) {
+        uniqueConvosMap.set(conv.id, conv);
+    }
+    const deduplicatedConvos = Array.from(uniqueConvosMap.values());
+
     // Sort by last message time or updated_at
-    allConvos.sort((a, b) => {
+    deduplicatedConvos.sort((a, b) => {
         const timeA = a.last_message?.created_at || a.updated_at;
         const timeB = b.last_message?.created_at || b.updated_at;
         return new Date(timeB).getTime() - new Date(timeA).getTime();
     });
 
-    return allConvos;
+    return deduplicatedConvos;
 }
 
 export async function getMessages(conversationId: string): Promise<Message[]> {
@@ -259,13 +282,11 @@ export async function sendMessage(
 
     if (error) throw error;
 
-    // Update conversation updated_at
     await supabase
         .from("conversations")
         .update({ updated_at: new Date().toISOString() })
         .eq("id", conversationId);
 
-    // Mark as read for sender
     await markConversationAsRead(conversationId);
 
     revalidatePath("/messages");
@@ -277,8 +298,7 @@ export async function createDirectConversation(targetUserId: string) {
 
     const supabase = getSupabaseServerClient();
 
-    // Check if conversation already exists using RPC
-    const { data: existingId, error: rpcError } = await supabase
+    const { data: existingId } = await supabase
         .rpc('get_direct_chat_id', {
             user1_id: user.id,
             user2_id: targetUserId
@@ -288,7 +308,6 @@ export async function createDirectConversation(targetUserId: string) {
         return existingId;
     }
 
-    // 1. Create conversation
     const { data: conv, error: convError } = await supabase
         .from("conversations")
         .insert({ type: "direct" })
@@ -297,7 +316,6 @@ export async function createDirectConversation(targetUserId: string) {
 
     if (convError) throw convError;
 
-    // 2. Add participants
     const { error: partError } = await supabase.from("conversation_participants").insert([
         { conversation_id: conv.id, user_id: user.id },
         { conversation_id: conv.id, user_id: targetUserId },
@@ -317,13 +335,11 @@ export async function getPotentialChatPartners() {
     let targetUserIds: string[] = [];
 
     if (user.role === "admin") {
-        // Admin can chat with everyone
         const { data } = await supabase.from("users").select("id, name, role, email");
         return data?.filter((u: any) => u.id !== user.id) || [];
     }
 
     if (user.role === "teacher") {
-        // 1. Get Teacher ID
         const { data: teacher } = await supabase
             .from("teachers")
             .select("id")
@@ -331,7 +347,6 @@ export async function getPotentialChatPartners() {
             .maybeSingle();
 
         if (teacher) {
-            // 2. Get Courses taught by teacher
             const { data: courses } = await supabase
                 .from("courses")
                 .select("id")
@@ -340,7 +355,6 @@ export async function getPotentialChatPartners() {
             const courseIds = courses?.map((c: any) => c.id) || [];
 
             if (courseIds.length > 0) {
-                // 3. Get Student IDs from enrollments
                 const { data: enrollments } = await supabase
                     .from("course_students")
                     .select("student_id")
@@ -349,7 +363,6 @@ export async function getPotentialChatPartners() {
                 const studentIds = enrollments?.map((e: any) => e.student_id) || [];
 
                 if (studentIds.length > 0) {
-                    // 4. Get User IDs from Students
                     const { data: students } = await supabase
                         .from("students")
                         .select("user_id")
@@ -360,7 +373,6 @@ export async function getPotentialChatPartners() {
             }
         }
 
-        // 5. Add Admins
         const { data: admins } = await supabase
             .from("users")
             .select("id")
@@ -368,7 +380,6 @@ export async function getPotentialChatPartners() {
         targetUserIds.push(...(admins?.map((a: any) => a.id) || []));
 
     } else if (user.role === "student") {
-        // 1. Get Student ID
         const { data: student } = await supabase
             .from("students")
             .select("id")
@@ -376,7 +387,6 @@ export async function getPotentialChatPartners() {
             .maybeSingle();
 
         if (student) {
-            // 2. Get Courses enrolled in
             const { data: enrollments } = await supabase
                 .from("course_students")
                 .select("course_id")
@@ -385,7 +395,6 @@ export async function getPotentialChatPartners() {
             const courseIds = enrollments?.map((e: any) => e.course_id) || [];
 
             if (courseIds.length > 0) {
-                // 3. Get Teacher IDs from courses
                 const { data: courses } = await supabase
                     .from("courses")
                     .select("teacher_id")
@@ -394,7 +403,6 @@ export async function getPotentialChatPartners() {
                 const teacherIds = courses?.map((c: any) => c.teacher_id).filter(Boolean) || [];
 
                 if (teacherIds.length > 0) {
-                    // 4. Get User IDs from Teachers
                     const { data: teachers } = await supabase
                         .from("teachers")
                         .select("user_id")
@@ -405,7 +413,6 @@ export async function getPotentialChatPartners() {
             }
         }
 
-        // 5. Add Admins
         const { data: admins } = await supabase
             .from("users")
             .select("id")
@@ -415,7 +422,6 @@ export async function getPotentialChatPartners() {
 
     if (targetUserIds.length === 0) return [];
 
-    // Fetch user details
     const { data, error } = await supabase
         .from("users")
         .select("id, name, role, email")
@@ -426,7 +432,6 @@ export async function getPotentialChatPartners() {
         return [];
     }
 
-    // Filter out self and duplicates
     const uniqueUsers = Array.from(new Map(data.map((item: any) => [item.id, item])).values());
     return uniqueUsers.filter((u: any) => u.id !== user.id);
 }
@@ -436,11 +441,6 @@ export async function markConversationAsRead(conversationId: string) {
     if (!user) return;
 
     const supabase = getSupabaseServerClient();
-
-    // Upsert to handle case where participant might not exist (though they should)
-    // or just update. For group chats, we might need to insert if not present?
-    // Actually, for group chats based on courses, we didn't add participants explicitly.
-    // So we MUST upsert here.
 
     await supabase
         .from("conversation_participants")
@@ -459,4 +459,57 @@ export async function getTotalUnreadCount() {
 
     const conversations = await getConversations();
     return conversations.reduce((acc, conv) => acc + (conv.unread_count || 0), 0);
+}
+
+export async function ensureGroupConversation(courseId: string): Promise<string> {
+    const user = await getCurrentUser();
+    if (!user) throw new Error("Unauthorized");
+
+    const supabase = getSupabaseServerClient();
+
+    const { data: existing } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("type", "group")
+        .eq("course_id", courseId)
+        .maybeSingle();
+
+    if (existing) return existing.id;
+
+    const { data, error } = await supabase
+        .from("conversations")
+        .upsert({
+            type: "group",
+            course_id: courseId
+        }, { onConflict: "course_id" })
+        .select("id")
+        .single();
+
+    if (error) {
+        const { data: retry } = await supabase
+            .from("conversations")
+            .select("id")
+            .eq("type", "group")
+            .eq("course_id", courseId)
+            .maybeSingle();
+
+        if (retry) return retry.id;
+        throw error;
+    }
+
+    return data.id;
+}
+export async function getUserInfo(userId: string) {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+        .from("users")
+        .select("id, name, role")
+        .eq("id", userId)
+        .single();
+
+    if (error) {
+        console.error("Error fetching user info:", error);
+        return null;
+    }
+    return data;
 }

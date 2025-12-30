@@ -14,6 +14,12 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from "@/components/ui/tabs";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -36,6 +42,7 @@ export function ConversationList({
     const [isNewChatOpen, setIsNewChatOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [activeTab, setActiveTab] = useState<"people" | "courses">("people");
     const router = useRouter();
 
     const handleStartChat = async (userId: string) => {
@@ -53,6 +60,11 @@ export function ConversationList({
     };
 
     const filteredConversations = conversations.filter(conv => {
+        // First filter by tab
+        if (activeTab === "people" && conv.type !== "direct") return false;
+        if (activeTab === "courses" && conv.type !== "group") return false;
+
+        // Then filter by search query
         const isGroup = conv.type === "group";
         const name = isGroup
             ? conv.course?.title || "Course Group"
@@ -113,11 +125,17 @@ export function ConversationList({
                         className="pl-8"
                     />
                 </div>
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="people">People</TabsTrigger>
+                        <TabsTrigger value="courses">Courses</TabsTrigger>
+                    </TabsList>
+                </Tabs>
             </div>
             <div className="flex-1 overflow-y-auto">
                 {filteredConversations.length === 0 ? (
                     <div className="p-4 text-center text-muted-foreground text-sm">
-                        {searchQuery ? "No conversations found." : "No conversations yet. Start a new one!"}
+                        {searchQuery ? "No conversations found." : "No conversations yet."}
                     </div>
                 ) : (
                     <div className="flex flex-col">
@@ -132,13 +150,15 @@ export function ConversationList({
 
                             const isUnread = (conv.unread_count || 0) > 0;
 
+                            const isSelected = selectedId === conv.id;
+
                             return (
                                 <button
                                     key={conv.id}
                                     onClick={() => onSelect(conv.id)}
                                     className={cn(
                                         "flex items-start gap-3 p-4 text-left hover:bg-muted/50 transition-colors border-b last:border-0",
-                                        selectedId === conv.id && "bg-muted"
+                                        isSelected && "bg-muted"
                                     )}
                                 >
                                     <div className="relative">
