@@ -32,7 +32,7 @@ export async function GET() {
           course:courses(id, title),
           students:assignment_students(student:students(id, user:users(id, name, email))),
           attachments:assignment_attachments(*),
-          submissions:assignment_submissions(*)
+          submissions:assignment_submissions(*, attachments:submission_attachments(*))
         `)
                 .order("created_at", { ascending: false });
             if (error) throw new Error(error.message);
@@ -54,7 +54,7 @@ export async function GET() {
           course:courses(id, title),
           students:assignment_students(student:students(id, user:users(id, name, email))),
           attachments:assignment_attachments(*),
-          submissions:assignment_submissions(*)
+          submissions:assignment_submissions(*, attachments:submission_attachments(*))
         `)
                 .eq("created_by", teacher.id)
                 .order("created_at", { ascending: false });
@@ -77,7 +77,7 @@ export async function GET() {
             *,
             course:courses(id, title),
             attachments:assignment_attachments(*),
-            submissions:assignment_submissions(*)
+            submissions:assignment_submissions(*, attachments:submission_attachments(*))
           )
         `)
                 .eq("student_id", student.id)

@@ -8,12 +8,12 @@ values ('chat-attachments', 'chat-attachments', true)
 on conflict (id) do nothing;
 
 -- RLS Policies for storage
-create policy "Authenticated users can upload chat attachments"
+create policy "Anyone can upload chat attachments"
 on storage.objects for insert
-to authenticated
+to public
 with check ( bucket_id = 'chat-attachments' );
 
-create policy "Authenticated users can read chat attachments"
+create policy "Anyone can read chat attachments"
 on storage.objects for select
-to authenticated
+to public
 using ( bucket_id = 'chat-attachments' );

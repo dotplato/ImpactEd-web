@@ -95,6 +95,7 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
     const [courseIdToStudents, setCourseIdToStudents] = useState<Record<string, Student[]>>({});
     const [studentSearch, setStudentSearch] = useState("");
     const [quizOpen, setQuizOpen] = useState(false);
+    const [viewOpen, setViewOpen] = useState(false);
     const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
     const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
     const [submissions, setSubmissions] = useState<Record<string, any>>({});
@@ -693,7 +694,16 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
                                                         Take Quiz
                                                     </Button>
                                                 )}
-                                                <Button variant="ghost" size="sm">View</Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setSelectedQuiz(q);
+                                                        setViewOpen(true);
+                                                    }}
+                                                >
+                                                    View
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -752,6 +762,140 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
                             <Button type="submit">Submit Quiz</Button>
                         </DialogFooter>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* View Quiz Dialog */}
+            <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>{selectedQuiz?.title}</DialogTitle>
+                        <DialogDescription>
+                            Quiz details and status.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-6 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Course</Label>
+                                <p className="text-sm font-medium">{selectedQuiz?.course?.title || "-"}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Due Date</Label>
+                                <div className="flex items-center gap-2 text-sm font-medium">
+                                    <Clock className="size-3.5 text-muted-foreground" />
+                                    {formatDueDate(selectedQuiz?.due_at || null)}
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Questions</Label>
+                                <p className="text-sm font-medium">
+                                    {selectedQuiz?.questions?.length || 0} Questions
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Description</Label>
+                            <div className="text-sm bg-muted/30 p-4 rounded-lg whitespace-pre-wrap">
+                                {selectedQuiz?.description || "No description provided."}
+                            </div>
+                        </div>
+
+                        {/* Teacher View: Submissions List */}
+                        {canCreate && (
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs text-muted-foreground">Submissions</Label>
+                                    <Badge variant="outline" className="text-[10px]">
+                                        {(selectedQuiz as any)?.submissions?.length || 0} / {selectedQuiz?.students?.length || 0}
+                                    </Badge>
+                                </div>
+                                <div className="border rounded-lg overflow-hidden">
+                                    <Table>
+                                        <TableHeader className="bg-muted/50">
+                                            <TableRow>
+                                                <TableHead className="h-8 text-[10px] uppercase">Student</TableHead>
+                                                <TableHead className="h-8 text-[10px] uppercase">Status</TableHead>
+                                                <TableHead className="h-8 text-[10px] uppercase text-right">Score</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {selectedQuiz?.students?.map((s: any) => {
+                                                const sub = (selectedQuiz as any).submissions?.find((sub: any) => sub.student_id === s.student.id);
+                                                return (
+                                                    <TableRow key={s.student.id}>
+                                                        <TableCell className="py-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="size-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold">
+                                                                    {s.student.user?.name?.[0] || "?"}
+                                                                </div>
+                                                                <span className="text-xs font-medium">{s.student.user?.name}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="py-2">
+                                                            {sub ? (
+                                                                <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-[10px] h-5">Completed</Badge>
+                                                            ) : (
+                                                                <Badge variant="secondary" className="text-[10px] h-5">Pending</Badge>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="py-2 text-right text-xs">
+                                                            {sub?.score ?? "-"}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Student View: My Submission */}
+                        {role === "student" && (
+                            <div className="space-y-3">
+                                <Label className="text-xs text-muted-foreground">My Result</Label>
+                                {submissions[selectedQuiz?.id || ""] ? (
+                                    <div className="p-4 border rounded-lg bg-green-50/30 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Completed</Badge>
+                                            <span className="text-xs text-muted-foreground">
+                                                {new Date(submissions[selectedQuiz?.id || ""].submitted_at).toLocaleString()}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
+                                            <span className="text-sm font-medium">Your Score</span>
+                                            <span className="text-lg font-bold text-primary">
+                                                {submissions[selectedQuiz?.id || ""].score}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-8 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                                        <HelpCircle className="size-6" />
+                                        <p className="text-xs">You haven't taken this quiz yet.</p>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="mt-2"
+                                            onClick={() => {
+                                                setViewOpen(false);
+                                                setQuizOpen(true);
+                                            }}
+                                        >
+                                            Take Quiz Now
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button onClick={() => setViewOpen(false)}>Close</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>

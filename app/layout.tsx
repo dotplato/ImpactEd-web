@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   description: "ImpactEd is a virtual coaching platform for all teachers, trainers and mentors to fulfill all their coaching and mentorship needs.",
 };
 
+import { Toaster } from "@/components/ui/sonner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -21,6 +23,7 @@ export default function RootLayout({
         className={`${outfit.className} antialiased`}
       >
         {children}
+        <Toaster />
       </body>
     </html>
   );

@@ -235,14 +235,14 @@ insert into storage.buckets (id, name, public)
 values ('assignment-attachments', 'assignment-attachments', true)
 on conflict (id) do nothing;
 
-create policy "Authenticated users can upload assignment attachments"
+create policy "Anyone can upload assignment attachments"
 on storage.objects for insert
-to authenticated
+to public
 with check ( bucket_id = 'assignment-attachments' );
 
-create policy "Authenticated users can read assignment attachments"
+create policy "Anyone can read assignment attachments"
 on storage.objects for select
-to authenticated
+to public
 using ( bucket_id = 'assignment-attachments' );
 
 -- Storage for submission attachments
@@ -250,12 +250,12 @@ insert into storage.buckets (id, name, public)
 values ('submission-attachments', 'submission-attachments', true)
 on conflict (id) do nothing;
 
-create policy "Authenticated users can upload submission attachments"
+create policy "Anyone can upload submission attachments"
 on storage.objects for insert
-to authenticated
+to public
 with check ( bucket_id = 'submission-attachments' );
 
-create policy "Authenticated users can read submission attachments"
+create policy "Anyone can read submission attachments"
 on storage.objects for select
-to authenticated
+to public
 using ( bucket_id = 'submission-attachments' );

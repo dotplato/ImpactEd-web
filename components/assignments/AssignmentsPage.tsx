@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import {
     LayoutGrid,
     Plus,
@@ -13,6 +13,9 @@ import {
     Loader2,
     Calendar as CalendarIcon,
     AlertCircle,
+    Download,
+    ExternalLink,
+    User,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -94,7 +97,11 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
     const [studentSearch, setStudentSearch] = useState("");
     const [uploading, setUploading] = useState(false);
     const [submitOpen, setSubmitOpen] = useState(false);
+    const [viewOpen, setViewOpen] = useState(false);
+    const [reviewOpen, setReviewOpen] = useState(false);
     const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+    const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
+    const [gradeValue, setGradeValue] = useState("");
     const [submissions, setSubmissions] = useState<Record<string, any>>({});
 
     const [form, setForm] = useState({
@@ -107,6 +114,38 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
         selectedStudents: [] as string[],
         attachments: [] as { filePath: string; fileName: string; mime?: string }[],
     });
+
+    const { todayAssignments, upcomingAssignments, pastAssignments } = useMemo(() => {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = new Date();
+        endOfToday.setHours(23, 59, 59, 999);
+
+        const t: Assignment[] = [];
+        const u: Assignment[] = [];
+        const p: Assignment[] = [];
+
+        for (const a of assignments) {
+            if (!a.due_at) {
+                u.push(a);
+                continue;
+            }
+            const d = new Date(a.due_at);
+            if (d >= startOfToday && d <= endOfToday) {
+                t.push(a);
+            } else if (d > endOfToday) {
+                u.push(a);
+            } else {
+                p.push(a);
+            }
+        }
+
+        t.sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime());
+        u.sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime());
+        p.sort((a, b) => new Date(b.due_at!).getTime() - new Date(a.due_at!).getTime());
+
+        return { todayAssignments: t, upcomingAssignments: u, pastAssignments: p };
+    }, [assignments]);
 
     const [submitForm, setSubmitForm] = useState({
         content: "",
@@ -188,11 +227,16 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
             const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
             const filePath = `assignments/${fileName}`;
 
-            const { error: uploadError } = await supabaseClient.storage
+            console.log("Uploading file to assignment-attachments:", filePath);
+            const { error: uploadError, data } = await supabaseClient.storage
                 .from("assignment-attachments")
                 .upload(filePath, file);
 
-            if (uploadError) throw uploadError;
+            if (uploadError) {
+                console.error("Upload error:", uploadError);
+                throw uploadError;
+            }
+            console.log("Upload success:", data);
 
             setForm(f => ({
                 ...f,
@@ -216,11 +260,16 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
             const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
             const filePath = `submissions/${fileName}`;
 
-            const { error: uploadError } = await supabaseClient.storage
+            console.log("Uploading file to submission-attachments:", filePath);
+            const { error: uploadError, data } = await supabaseClient.storage
                 .from("submission-attachments")
                 .upload(filePath, file);
 
-            if (uploadError) throw uploadError;
+            if (uploadError) {
+                console.error("Upload error:", uploadError);
+                throw uploadError;
+            }
+            console.log("Upload success:", data);
 
             setSubmitForm(f => ({
                 ...f,
@@ -259,18 +308,75 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
         }
     }
 
+    async function onGrade(e: React.FormEvent) {
+        e.preventDefault();
+        if (!selectedSubmission || !gradeValue) return;
+
+        const grade = Number(gradeValue);
+        if (isNaN(grade)) {
+            toast.error("Please enter a valid number for the grade");
+            return;
+        }
+
+        if (grade > (selectedAssignment?.total_marks || 0)) {
+            toast.error(`Grade cannot exceed maximum marks (${selectedAssignment?.total_marks})`);
+            return;
+        }
+
+        if (grade < 0) {
+            toast.error("Grade cannot be negative");
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/submissions/${selectedSubmission.id}/grade`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ grade: Number(gradeValue) }),
+            });
+
+            if (!res.ok) {
+                const d = await res.json();
+                throw new Error(d.error || "Failed to save grade");
+            }
+
+            setReviewOpen(false);
+            setGradeValue("");
+            loadAssignments();
+            toast.success("Grade saved successfully");
+        } catch (err: any) {
+            toast.error(err.message);
+        }
+    }
+
     async function onCreate(e: React.FormEvent) {
         e.preventDefault();
         if (!form.courseId || !form.title) return;
+
+        if (form.dueAt && new Date(form.dueAt) < new Date()) {
+            toast.error("Due date cannot be in the past");
+            return;
+        }
+
+        const totalMarks = Number(form.totalMarks);
+        if (form.totalMarks && (isNaN(totalMarks) || totalMarks <= 0)) {
+            toast.error("Total marks must be a positive number");
+            return;
+        }
 
         try {
             const res = await fetch("/api/assignments", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    ...form,
-                    totalMarks: form.totalMarks ? Number(form.totalMarks) : undefined,
-                    minPassMarks: form.minPassMarks ? Number(form.minPassMarks) : undefined,
+                    title: form.title,
+                    description: form.description,
+                    courseId: form.courseId,
+                    dueAt: form.dueAt,
+                    totalMarks: Number(form.totalMarks),
+                    minPassMarks: Number(form.minPassMarks),
+                    selectedStudents: form.selectedStudents,
+                    attachments: form.attachments,
                 }),
             });
 
@@ -295,6 +401,97 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
         } catch (err: any) {
             toast.error(err.message);
         }
+    }
+
+    function renderAssignmentTable(list: Assignment[], emptyMessage: string) {
+        if (list.length === 0) {
+            return <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg border-dashed">{emptyMessage}</p>;
+        }
+
+        return (
+            <Card className="px-2">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Assignment</TableHead>
+                            <TableHead>Course</TableHead>
+                            <TableHead>Due Date</TableHead>
+                            <TableHead>Marks</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {list.map((a) => {
+                            const submission = (a as any).submissions?.[0] || submissions[a.id];
+                            const isSubmitted = !!submission;
+
+                            return (
+                                <TableRow key={a.id}>
+                                    <TableCell className="font-medium">
+                                        <div className="flex items-center gap-2">
+                                            <FileText className="size-4 text-primary" />
+                                            {a.title}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>{a.course?.title || "-"}</TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <Clock className="size-3.5 text-muted-foreground" />
+                                            {formatDueDate(a.due_at)}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {a.total_marks ? (
+                                            <Badge variant="outline" className="font-mono">
+                                                {submission?.grade !== undefined && submission?.grade !== null ? submission.grade : "-"} / {a.total_marks}
+                                            </Badge>
+                                        ) : "-"}
+                                    </TableCell>
+                                    <TableCell>
+                                        {isSubmitted ? (
+                                            submission.status === 'graded' ? (
+                                                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Graded</Badge>
+                                            ) : (
+                                                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Submitted</Badge>
+                                            )
+                                        ) : (
+                                            <Badge variant="secondary">Pending</Badge>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            {role === "student" && !isSubmitted && (
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setSelectedAssignment(a);
+                                                        setSubmitOpen(true);
+                                                    }}
+                                                >
+                                                    Submit
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setSelectedAssignment(a);
+                                                    setViewOpen(true);
+                                                }}
+                                            >
+                                                View
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </Card>
+        );
     }
 
     const formatDueDate = (date: string | null) => {
@@ -619,81 +816,34 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
                     <Loader2 className="size-8 animate-spin text-muted-foreground" />
                 </div>
             ) : (
-                <Card className="px-2">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Assignment</TableHead>
-                                <TableHead>Course</TableHead>
-                                <TableHead>Due Date</TableHead>
-                                <TableHead>Marks</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {assignments.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                                        No assignments found.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                assignments.map((a) => {
-                                    const submission = (a as any).submissions?.[0] || submissions[a.id];
-                                    const isSubmitted = !!submission;
+                <div className="space-y-8">
+                    {/* Today */}
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider font-bold">Today</Badge>
+                            <div className="h-px flex-1 bg-border" />
+                        </div>
+                        {renderAssignmentTable(todayAssignments, "No assignments due today.")}
+                    </section>
 
-                                    return (
-                                        <TableRow key={a.id}>
-                                            <TableCell className="font-medium">
-                                                <div className="flex items-center gap-2">
-                                                    <FileText className="size-4 text-primary" />
-                                                    {a.title}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{a.course?.title || "-"}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2 text-xs">
-                                                    <Clock className="size-3.5 text-muted-foreground" />
-                                                    {formatDueDate(a.due_at)}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                {a.total_marks ? (
-                                                    <Badge variant="outline">
-                                                        {submission?.grade ?? (a.min_pass_marks || 0)} / {a.total_marks}
-                                                    </Badge>
-                                                ) : "-"}
-                                            </TableCell>
-                                            <TableCell>
-                                                {isSubmitted ? (
-                                                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Submitted</Badge>
-                                                ) : (
-                                                    <Badge variant="secondary">Pending</Badge>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {role === "student" && !isSubmitted && (
-                                                    <Button
-                                                        variant="secondary"
-                                                        size="sm"
-                                                        onClick={() => {
-                                                            setSelectedAssignment(a);
-                                                            setSubmitOpen(true);
-                                                        }}
-                                                    >
-                                                        Submit
-                                                    </Button>
-                                                )}
-                                                <Button variant="ghost" size="sm">View</Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })
-                            )}
-                        </TableBody>
-                    </Table>
-                </Card>
+                    {/* Upcoming */}
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider font-bold">Upcoming</Badge>
+                            <div className="h-px flex-1 bg-border" />
+                        </div>
+                        {renderAssignmentTable(upcomingAssignments, "No upcoming assignments.")}
+                    </section>
+
+                    {/* Past */}
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider font-bold">Past</Badge>
+                            <div className="h-px flex-1 bg-border" />
+                        </div>
+                        {renderAssignmentTable(pastAssignments, "No past assignments.")}
+                    </section>
+                </div>
             )}
 
             {/* Submit Assignment Dialog */}
@@ -750,6 +900,299 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
                             <Button type="submit" disabled={uploading}>Submit Assignment</Button>
                         </DialogFooter>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* View Assignment Dialog */}
+            <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>{selectedAssignment?.title}</DialogTitle>
+                        <DialogDescription>
+                            Assignment details and instructions.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-6 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Course</Label>
+                                <p className="text-sm font-medium">{selectedAssignment?.course?.title || "-"}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Due Date</Label>
+                                <div className="flex items-center gap-2 text-sm font-medium">
+                                    <Clock className="size-3.5 text-muted-foreground" />
+                                    {formatDueDate(selectedAssignment?.due_at || null)}
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Marks</Label>
+                                <p className="text-sm font-medium">
+                                    {selectedAssignment?.min_pass_marks || 0} / {selectedAssignment?.total_marks || "-"}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Instructions</Label>
+                            <div className="text-sm bg-muted/30 p-4 rounded-lg whitespace-pre-wrap">
+                                {selectedAssignment?.description_richjson || "No instructions provided."}
+                            </div>
+                        </div>
+
+                        {selectedAssignment?.attachments && selectedAssignment.attachments.length > 0 && (
+                            <div className="space-y-2">
+                                <Label className="text-xs text-muted-foreground">Attachments</Label>
+                                <div className="grid gap-2">
+                                    {selectedAssignment.attachments.map((att) => (
+                                        <div key={att.id} className="flex items-center justify-between p-2 border rounded-lg bg-background">
+                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                <FileText className="size-4 text-primary shrink-0" />
+                                                <span className="text-xs truncate">{att.file_name}</span>
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="size-8"
+                                                asChild
+                                            >
+                                                <a
+                                                    href={supabaseClient.storage.from('assignment-attachments').getPublicUrl(att.file_path).data.publicUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    download={att.file_name}
+                                                >
+                                                    <Download className="size-4" />
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Teacher View: Submissions List */}
+                        {canCreate && (
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs text-muted-foreground">Submissions</Label>
+                                    <Badge variant="outline" className="text-[10px]">
+                                        {(selectedAssignment as any)?.submissions?.length || 0} / {selectedAssignment?.students?.length || 0}
+                                    </Badge>
+                                </div>
+                                <div className="border rounded-lg overflow-hidden">
+                                    <Table>
+                                        <TableHeader className="bg-muted/50">
+                                            <TableRow>
+                                                <TableHead className="h-8 text-[10px] uppercase">Student</TableHead>
+                                                <TableHead className="h-8 text-[10px] uppercase">Status</TableHead>
+                                                <TableHead className="h-8 text-[10px] uppercase">Grade</TableHead>
+                                                <TableHead className="h-8 text-[10px] uppercase text-right">Action</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {selectedAssignment?.students?.map((s: any) => {
+                                                const sub = (selectedAssignment as any).submissions?.find((sub: any) => sub.student_id === s.student.id);
+                                                return (
+                                                    <TableRow key={s.student.id}>
+                                                        <TableCell className="py-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="size-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold">
+                                                                    {s.student.user?.name?.[0] || "?"}
+                                                                </div>
+                                                                <span className="text-xs font-medium">{s.student.user?.name}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="py-2">
+                                                            {sub ? (
+                                                                sub.status === 'graded' ? (
+                                                                    <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-[10px] h-5">Graded</Badge>
+                                                                ) : (
+                                                                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-[10px] h-5">Submitted</Badge>
+                                                                )
+                                                            ) : (
+                                                                <Badge variant="secondary" className="text-[10px] h-5">Pending</Badge>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="py-2 text-xs">
+                                                            {sub?.grade ?? "-"}
+                                                        </TableCell>
+                                                        <TableCell className="py-2 text-right">
+                                                            {sub && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-7 text-[10px]"
+                                                                    onClick={() => {
+                                                                        setSelectedSubmission(sub);
+                                                                        setGradeValue(sub.grade?.toString() || "");
+                                                                        setReviewOpen(true);
+                                                                    }}
+                                                                >
+                                                                    Review
+                                                                </Button>
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Student View: My Submission */}
+                        {role === "student" && (
+                            <div className="space-y-3">
+                                <Label className="text-xs text-muted-foreground">My Submission</Label>
+                                {submissions[selectedAssignment?.id || ""] ? (
+                                    <div className="p-4 border rounded-lg bg-green-50/30 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                {submissions[selectedAssignment?.id || ""].status === 'graded' ? (
+                                                    <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Graded</Badge>
+                                                ) : (
+                                                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Submitted</Badge>
+                                                )}
+                                                {submissions[selectedAssignment?.id || ""].grade !== null && (
+                                                    <Badge variant="outline" className="border-blue-200 text-blue-700">
+                                                        Score: {submissions[selectedAssignment?.id || ""].grade} / {selectedAssignment?.total_marks}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            <span className="text-xs text-muted-foreground">
+                                                {new Date(submissions[selectedAssignment?.id || ""].submitted_at).toLocaleString()}
+                                            </span>
+                                        </div>
+                                        <div className="text-sm whitespace-pre-wrap">
+                                            {submissions[selectedAssignment?.id || ""].content_richjson}
+                                        </div>
+                                        {submissions[selectedAssignment?.id || ""].attachments && submissions[selectedAssignment?.id || ""].attachments.length > 0 && (
+                                            <div className="space-y-2 mt-4">
+                                                <Label className="text-[10px] text-muted-foreground uppercase">My Attachments</Label>
+                                                <div className="grid gap-2">
+                                                    {submissions[selectedAssignment?.id || ""].attachments.map((att: any) => (
+                                                        <div key={att.id} className="flex items-center justify-between p-2 border rounded-lg bg-background">
+                                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                                <FileText className="size-4 text-primary shrink-0" />
+                                                                <span className="text-xs truncate">{att.file_name}</span>
+                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="size-8"
+                                                                asChild
+                                                            >
+                                                                <a
+                                                                    href={supabaseClient.storage.from('submission-attachments').getPublicUrl(att.file_path).data.publicUrl}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    download={att.file_name}
+                                                                >
+                                                                    <Download className="size-4" />
+                                                                </a>
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="p-8 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                                        <AlertCircle className="size-6" />
+                                        <p className="text-xs">You haven't submitted this assignment yet.</p>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="mt-2"
+                                            onClick={() => {
+                                                setViewOpen(false);
+                                                setSubmitOpen(true);
+                                            }}
+                                        >
+                                            Submit Now
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button onClick={() => setViewOpen(false)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Review Submission Dialog */}
+            <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle>Review Submission</DialogTitle>
+                        <DialogDescription>
+                            Review student's work and provide a grade.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-6 py-4">
+                        <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Student's Answer</Label>
+                            <div className="text-sm bg-muted/30 p-4 rounded-lg whitespace-pre-wrap min-h-[100px]">
+                                {selectedSubmission?.content_richjson || "No text provided."}
+                            </div>
+                        </div>
+
+                        {selectedSubmission?.attachments && selectedSubmission.attachments.length > 0 && (
+                            <div className="space-y-2">
+                                <Label className="text-xs text-muted-foreground">Submitted Files</Label>
+                                <div className="grid gap-2">
+                                    {selectedSubmission.attachments.map((att: any) => (
+                                        <div key={att.id} className="flex items-center justify-between p-2 border rounded-lg bg-background">
+                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                <FileText className="size-4 text-primary shrink-0" />
+                                                <span className="text-xs truncate">{att.file_name}</span>
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="size-8"
+                                                asChild
+                                            >
+                                                <a
+                                                    href={supabaseClient.storage.from('submission-attachments').getPublicUrl(att.file_path).data.publicUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    download={att.file_name}
+                                                >
+                                                    <Download className="size-4" />
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <form onSubmit={onGrade} className="space-y-4 pt-4 border-t">
+                            <div className="grid gap-2">
+                                <Label htmlFor="grade">Grade / Marks (Max: {selectedAssignment?.total_marks || "-"})</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        id="grade"
+                                        type="number"
+                                        value={gradeValue}
+                                        onChange={(e) => setGradeValue(e.target.value)}
+                                        placeholder="Enter grade..."
+                                        className="max-w-[150px]"
+                                    />
+                                    <Button type="submit" className="flex-1">Save Grade</Button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>
