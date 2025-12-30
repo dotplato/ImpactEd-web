@@ -101,7 +101,11 @@ export function ConversationList({
                                                 disabled={isLoading}
                                             >
                                                 <Avatar className="h-8 w-8 mr-2">
-                                                    <AvatarFallback>{user.name?.[0] || "?"}</AvatarFallback>
+                                                    {user.image_url ? (
+                                                        <AvatarImage src={user.image_url} />
+                                                    ) : (
+                                                        <AvatarFallback>{user.name?.[0] || "?"}</AvatarFallback>
+                                                    )}
                                                 </Avatar>
                                                 <div className="text-left flex-1">
                                                     <div className="font-medium">{user.name}</div>
@@ -145,7 +149,10 @@ export function ConversationList({
                                 ? conv.course?.title || "Course Group"
                                 : conv.participants?.[0]?.name || "Unknown User";
 
-                            const lastMessage = conv.last_message?.content || "No messages yet";
+                            const hasAttachments = (conv.last_message?.attachments?.length || 0) > 0;
+                            const lastMessageText = conv.last_message?.content || (hasAttachments ? "File attachment" : "No messages yet");
+                            const isAttachmentOnly = !conv.last_message?.content && hasAttachments;
+
                             const time = new Date(conv.last_message?.created_at || conv.updated_at).toLocaleDateString();
 
                             const isUnread = (conv.unread_count || 0) > 0;
@@ -163,9 +170,13 @@ export function ConversationList({
                                 >
                                     <div className="relative">
                                         <Avatar>
-                                            <AvatarFallback>
-                                                {isGroup ? <Users className="h-4 w-4" /> : name[0]}
-                                            </AvatarFallback>
+                                            {!isGroup && conv.participants?.[0]?.image_url ? (
+                                                <AvatarImage src={conv.participants[0].image_url} />
+                                            ) : (
+                                                <AvatarFallback>
+                                                    {isGroup ? <Users className="h-4 w-4" /> : name[0]}
+                                                </AvatarFallback>
+                                            )}
                                         </Avatar>
                                         {isUnread && (
                                             <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-blue-600 border-2 border-background" />
@@ -178,7 +189,7 @@ export function ConversationList({
                                         </div>
                                         <p className={cn("text-sm truncate", isUnread ? "font-semibold text-foreground" : "text-muted-foreground")}>
                                             {conv.last_message?.sender_id === currentUser.id && "You: "}
-                                            {lastMessage}
+                                            {isAttachmentOnly ? <span className="italic">{lastMessageText}</span> : lastMessageText}
                                         </p>
                                     </div>
                                 </button>

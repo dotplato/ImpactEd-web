@@ -24,7 +24,7 @@ export type Message = {
     sender_id: string;
     content: string;
     created_at: string;
-    sender?: { name: string; role: string };
+    sender?: { name: string; role: string; image_url?: string | null };
     attachments?: { url: string; name: string; type: string; size: number }[];
 };
 
@@ -33,6 +33,7 @@ export type UserParticipant = {
     name: string;
     role: string;
     email: string;
+    image_url?: string | null;
 };
 
 export async function getConversations(): Promise<Conversation[]> {
@@ -49,7 +50,7 @@ export async function getConversations(): Promise<Conversation[]> {
       conversation:conversations!inner(
         id, type, created_at, updated_at,
         participants:conversation_participants(
-          user:users(id, name, role, email)
+          user:users(id, name, role, email, image_url)
         )
       )
     `)
@@ -209,7 +210,7 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
         .from("messages")
         .select(`
       *,
-      sender:users(id, name, role)
+      sender:users(id, name, role, image_url)
     `)
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
@@ -335,7 +336,7 @@ export async function getPotentialChatPartners() {
     let targetUserIds: string[] = [];
 
     if (user.role === "admin") {
-        const { data } = await supabase.from("users").select("id, name, role, email");
+        const { data } = await supabase.from("users").select("id, name, role, email, image_url");
         return data?.filter((u: any) => u.id !== user.id) || [];
     }
 
@@ -424,7 +425,7 @@ export async function getPotentialChatPartners() {
 
     const { data, error } = await supabase
         .from("users")
-        .select("id, name, role, email")
+        .select("id, name, role, email, image_url")
         .in("id", targetUserIds);
 
     if (error) {
@@ -503,7 +504,7 @@ export async function getUserInfo(userId: string) {
     const supabase = getSupabaseServerClient();
     const { data, error } = await supabase
         .from("users")
-        .select("id, name, role")
+        .select("id, name, role, image_url")
         .eq("id", userId)
         .single();
 

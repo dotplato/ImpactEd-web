@@ -2,7 +2,7 @@
 
 import { Conversation, Message, getMessages, sendMessage, getUserInfo } from "@/lib/actions/chat";
 import { AppUser } from "@/lib/auth/session";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Send, Users, Paperclip, X, FileIcon, ImageIcon, Loader2 } from "lucide-react";
@@ -191,7 +191,7 @@ export function ChatWindow({ conversation, currentUser, onBack, onMessageSent }:
                 sender_id: currentUser.id,
                 content: content,
                 created_at: new Date().toISOString(),
-                sender: { name: currentUser.name || "You", role: currentUser.role },
+                sender: { name: currentUser.name || "You", role: currentUser.role, image_url: currentUser.image_url },
                 attachments: uploadedFiles
             };
 
@@ -235,9 +235,21 @@ export function ChatWindow({ conversation, currentUser, onBack, onMessageSent }:
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <Avatar>
-                    <AvatarFallback>
-                        {isGroup ? <Users className="h-4 w-4" /> : title[0]}
-                    </AvatarFallback>
+                    {isGroup ? (
+                        <AvatarFallback>
+                            <Users className="h-4 w-4" />
+                        </AvatarFallback>
+                    ) : (
+                        <>
+                            {(() => {
+                                const otherParticipant = conversation.participants?.find(p => p.id !== currentUser.id);
+                                if (otherParticipant?.image_url) {
+                                    return <AvatarImage src={otherParticipant.image_url} />;
+                                }
+                                return <AvatarFallback>{title[0]}</AvatarFallback>;
+                            })()}
+                        </>
+                    )}
                 </Avatar>
                 <div>
                     <h3 className="font-semibold">{title}</h3>
@@ -266,9 +278,13 @@ export function ChatWindow({ conversation, currentUser, onBack, onMessageSent }:
                             >
                                 {!isMe && isGroup && (
                                     <Avatar className="h-8 w-8 mt-1 shrink-0">
-                                        <AvatarFallback className="text-[10px]">
-                                            {senderName[0]}
-                                        </AvatarFallback>
+                                        {msg.sender?.image_url ? (
+                                            <AvatarImage src={msg.sender.image_url} />
+                                        ) : (
+                                            <AvatarFallback className="text-[10px]">
+                                                {senderName[0]}
+                                            </AvatarFallback>
+                                        )}
                                     </Avatar>
                                 )}
                                 <div className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
@@ -277,68 +293,75 @@ export function ChatWindow({ conversation, currentUser, onBack, onMessageSent }:
                                             {senderName}
                                         </span>
                                     )}
-                                    <div
-                                        className={cn(
-                                            "rounded-2xl px-4 py-2 text-sm",
-                                            isMe
-                                                ? "bg-primary text-primary-foreground rounded-br-none"
-                                                : "bg-muted text-foreground rounded-bl-none"
-                                        )}
-                                    >
-                                        {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
-                                            <div className="flex flex-col gap-2 mb-2">
-                                                {msg.attachments.map((att, idx) => {
-                                                    if (!att || !att.url) return null;
+                                    {(msg.content || (Array.isArray(msg.attachments) && msg.attachments.length > 0)) ? (
+                                        <div
+                                            className={cn(
+                                                "rounded-2xl text-sm overflow-hidden",
+                                                isMe
+                                                    ? "bg-primary text-primary-foreground rounded-br-none"
+                                                    : "bg-muted text-foreground rounded-bl-none",
+                                                // If it's only an image, we might want less padding
+                                                (msg.content || (msg.attachments?.some(a => !a.type?.startsWith('image/')))) ? "px-4 py-2" : "p-1"
+                                            )}
+                                        >
+                                            {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
+                                                <div className="flex flex-col gap-2 mb-2">
+                                                    {msg.attachments.map((att, idx) => {
+                                                        if (!att || !att.url) return null;
 
-                                                    // Infer type if missing
-                                                    const fileType = att.type || (att.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image/jpeg' : 'application/octet-stream');
-                                                    const isImage = fileType.startsWith('image/');
+                                                        // Infer type if missing
+                                                        const fileType = att.type || (att.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image/jpeg' : 'application/octet-stream');
+                                                        const isImage = fileType.startsWith('image/');
 
-                                                    return (
-                                                        <div key={idx} className="max-w-full">
-                                                            {isImage ? (
-                                                                <a href={att.url} target="_blank" rel="noopener noreferrer" className="block">
-                                                                    <img
-                                                                        src={att.url}
-                                                                        alt={att.name || 'Attachment'}
-                                                                        className="max-w-full rounded-lg max-h-[300px] object-cover border border-border/50"
-                                                                    />
-                                                                </a>
-                                                            ) : (
-                                                                <a
-                                                                    href={att.url}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className={cn(
-                                                                        "flex items-center gap-3 p-3 rounded-lg transition-colors border max-w-xs",
-                                                                        isMe
-                                                                            ? "bg-primary-foreground/10 border-primary-foreground/20 hover:bg-primary-foreground/20"
-                                                                            : "bg-background border-border hover:bg-accent"
-                                                                    )}
-                                                                >
-                                                                    <div className={cn(
-                                                                        "p-2 rounded-full",
-                                                                        isMe ? "bg-primary-foreground/20" : "bg-muted"
-                                                                    )}>
-                                                                        <FileIcon className="h-4 w-4" />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <p className="text-sm font-medium truncate">{att.name || 'File'}</p>
-                                                                        {att.size && (
-                                                                            <p className={cn("text-xs opacity-70", isMe ? "text-primary-foreground/70" : "text-muted-foreground")}>
-                                                                                {(att.size / 1024).toFixed(1)} KB
-                                                                            </p>
+                                                        return (
+                                                            <div key={idx} className="max-w-full">
+                                                                {isImage ? (
+                                                                    <a href={att.url} target="_blank" rel="noopener noreferrer" className="block">
+                                                                        <img
+                                                                            src={att.url}
+                                                                            alt={att.name || 'Attachment'}
+                                                                            className="max-w-full rounded-lg max-h-[300px] object-cover border border-border/50"
+                                                                        />
+                                                                    </a>
+                                                                ) : (
+                                                                    <a
+                                                                        href={att.url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className={cn(
+                                                                            "flex items-center gap-3 p-3 rounded-lg transition-colors border max-w-xs",
+                                                                            isMe
+                                                                                ? "bg-primary-foreground/10 border-primary-foreground/20 hover:bg-primary-foreground/20"
+                                                                                : "bg-background border-border hover:bg-accent"
                                                                         )}
-                                                                    </div>
-                                                                </a>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                        {msg.content && <div className="whitespace-pre-wrap">{msg.content}</div>}
-                                    </div>
+                                                                    >
+                                                                        <div className={cn(
+                                                                            "p-2 rounded-full",
+                                                                            isMe ? "bg-primary-foreground/20" : "bg-muted"
+                                                                        )}>
+                                                                            <FileIcon className="h-4 w-4" />
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className="text-sm font-medium truncate">{att.name || 'File'}</p>
+                                                                            {att.size && (
+                                                                                <p className={cn("text-xs opacity-70", isMe ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                                                                                    {(att.size / 1024).toFixed(1)} KB
+                                                                                </p>
+                                                                            )}
+                                                                        </div>
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                            {msg.content && <div className={cn("whitespace-pre-wrap", (Array.isArray(msg.attachments) && msg.attachments.length > 0) && "mt-2")}>{msg.content}</div>}
+                                        </div>
+                                    ) : (
+                                        // If somehow we have an empty message, don't render the bubble but log it
+                                        <div className="hidden">{console.log("Empty message detected:", msg.id)}</div>
+                                    )}
                                     <span className="text-[10px] text-muted-foreground mt-1 px-1">
                                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>

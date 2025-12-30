@@ -9,6 +9,7 @@ export type AppUser = {
   name: string | null;
   phone: string | null;
   role: "admin" | "teacher" | "student";
+  image_url: string | null;
 };
 
 export async function getCurrentSession() {
@@ -24,13 +25,13 @@ export async function getCurrentUser(): Promise<AppUser | null> {
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase
     .from("sessions")
-    .select("user_id, users:users(id, email, name, phone, role)")
+    .select("user_id, users:users(id, email, name, phone, role, image_url)")
     .eq("session_token", token)
     .gt("expires_at", new Date().toISOString())
     .maybeSingle();
   if (error || !data?.users) return null;
   const u = data.users as any;
-  return { id: u.id, email: u.email, name: u.name, phone: u.phone, role: u.role };
+  return { id: u.id, email: u.email, name: u.name, phone: u.phone, role: u.role, image_url: u.image_url };
 }
 
 

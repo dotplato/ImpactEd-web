@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   // 1. Insert user
   const { data: user, error: userErr } = await supabase
     .from('users')
-    .insert({ email: email.toLowerCase(), name, role: 'teacher', phone: phone || null })
+    .insert({ email: email.toLowerCase(), name, role: 'teacher', phone: phone || null, image_url: profile_pic || null })
     .select('id')
     .single();
   if (userErr || !user) return NextResponse.json({ error: userErr?.message || 'Could not create user' }, { status: 400 });
@@ -40,7 +40,6 @@ export async function POST(req: Request) {
   // 3. Insert teacher row
   const { error: tErr } = await supabase.from('teachers').insert({
     user_id: user.id,
-    profile_pic: profile_pic || null,
     join_date: joinDate,
     phone: phone || null,
     qualification: qualification || null,
@@ -54,7 +53,7 @@ export async function GET() {
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase
     .from('teachers')
-    .select('id, profile_pic, join_date, phone, qualification, user:users(id, email, name)')
+    .select('id, join_date, phone, qualification, user:users(id, email, name, image_url)')
     .order('created_at', { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ teachers: data ?? [] });

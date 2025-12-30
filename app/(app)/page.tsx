@@ -11,14 +11,14 @@ async function getRecentTeachers(limit = 8) {
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase
     .from("teachers")
-    .select("id, profile_pic, qualification, user:users!teachers_user_id_fkey(id, name, email)")
+    .select("id, qualification, user:users!teachers_user_id_fkey(id, name, email, image_url)")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) console.error(error);
   // Transform the data to match the expected type
   return (data ?? []).map((t: any) => ({
     id: t.id,
-    profile_pic: t.profile_pic,
+    profile_pic: t.user?.image_url,
     qualification: t.qualification,
     user: Array.isArray(t.user) ? t.user[0] : t.user,
   }));
@@ -52,16 +52,16 @@ async function getTeacherCourses(userId: string) {
     .select("id")
     .eq("user_id", userId)
     .maybeSingle();
-  
+
   if (!teacher) return [];
-  
+
   const { data: courses } = await supabase
     .from("courses")
     .select("id, title, teacher:teachers(id, user:users(name, email))")
     .eq("teacher_id", teacher.id)
     .order("created_at", { ascending: false })
     .limit(5);
-  
+
   return courses ?? [];
 }
 
@@ -72,22 +72,22 @@ async function getStudentCourses(userId: string) {
     .select("id")
     .eq("user_id", userId)
     .maybeSingle();
-  
+
   if (!student) return [];
-  
+
   const { data: enrollments } = await supabase
     .from("course_students")
     .select("course:courses(id, title, teacher:teachers(id, user:users(name, email)))")
     .eq("student_id", student.id)
     .limit(5);
-  
+
   return (enrollments ?? []).map((e: any) => e.course).filter(Boolean);
 }
 
 async function getUpcomingSessions(userId: string, role: string) {
   const supabase = getSupabaseServerClient();
   const now = new Date().toISOString();
-  
+
   if (role === "admin") {
     const { data } = await supabase
       .from("course_sessions")
@@ -97,16 +97,16 @@ async function getUpcomingSessions(userId: string, role: string) {
       .limit(5);
     return data ?? [];
   }
-  
+
   if (role === "teacher") {
     const { data: teacher } = await supabase
       .from("teachers")
       .select("id")
       .eq("user_id", userId)
       .maybeSingle();
-    
+
     if (!teacher) return [];
-    
+
     const { data } = await supabase
       .from("course_sessions")
       .select("id, title, scheduled_at, duration_minutes, course:courses(id, title)")
@@ -116,32 +116,32 @@ async function getUpcomingSessions(userId: string, role: string) {
       .limit(5);
     return data ?? [];
   }
-  
+
   if (role === "student") {
     const { data: student } = await supabase
       .from("students")
       .select("id")
       .eq("user_id", userId)
       .maybeSingle();
-    
+
     if (!student) return [];
-    
+
     const { data: enrollments } = await supabase
       .from("session_students")
       .select("session:course_sessions(id, title, scheduled_at, duration_minutes, course:courses(id, title))")
       .eq("student_id", student.id);
-    
+
     if (!enrollments) return [];
-    
+
     const sessions = enrollments
       .map((e: any) => e.session)
       .filter((s: any) => s && new Date(s.scheduled_at) >= new Date(now))
       .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
       .slice(0, 5);
-    
+
     return sessions;
   }
-  
+
   return [];
 }
 
@@ -160,9 +160,9 @@ export default async function DashboardPage() {
 
     return (
       <div className="space-y-6">
-        <AdminDashboardKpis 
-          teachers={teachers} 
-          students={students} 
+        <AdminDashboardKpis
+          teachers={teachers}
+          students={students}
           courses={courses}
           teacherTrend={12.5}
           studentTrend={8.3}

@@ -7,18 +7,19 @@ const EditStudentSchema = z.object({
   email: z.string().email(),
   studentId: z.string().min(1),
   feeStatus: z.string().min(1),
-  gender: z.enum(['Male','Female','Other']),
+  gender: z.enum(['Male', 'Female', 'Other']),
   joinDate: z.string().min(4),
   phone: z.string().optional(),
+  image_url: z.string().optional(),
 });
 
-export async function PATCH(req, { params }) {
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const body = await req.json();
   const parsed = EditStudentSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { name, email, studentId, feeStatus, gender, joinDate, phone } = parsed.data;
+  const { name, email, studentId, feeStatus, gender, joinDate, phone, image_url } = parsed.data;
   const supabase = getSupabaseServerClient();
 
   // Find the student + user IDs for update
@@ -26,7 +27,7 @@ export async function PATCH(req, { params }) {
   if (findErr || !stu) return NextResponse.json({ error: 'Student not found' }, { status: 404 });
 
   // Update users table
-  const { error: userErr } = await supabase.from('users').update({ name, email: email.toLowerCase(), phone: phone || null }).eq('id', stu.user_id);
+  const { error: userErr } = await supabase.from('users').update({ name, email: email.toLowerCase(), phone: phone || null, image_url: image_url || null }).eq('id', stu.user_id);
   if (userErr) return NextResponse.json({ error: userErr.message }, { status: 400 });
   // Update students
   const { error: stuErr } = await supabase.from('students').update({
@@ -41,7 +42,7 @@ export async function PATCH(req, { params }) {
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(req, { params }) {
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   const supabase = getSupabaseServerClient();
   // Optionally: also remove user row (cascade deletes student row)
   // First, get student and user_id

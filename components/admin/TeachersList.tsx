@@ -5,9 +5,8 @@ import { StatusTag } from "../ui/status-tag";
 
 type Teacher = {
   id: string;
-  profile_pic?: string | null;
   qualification?: string | null;
-  user?: { name: string; email: string } | null;
+  user?: { name: string; email: string; image_url?: string | null } | null;
 };
 
 type Props = {
@@ -32,7 +31,7 @@ export function TeachersList({ teachers }: Props) {
             className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors border-b last:border-b-0"
           >
             <Avatar className="size-10">
-              <AvatarImage src={t.profile_pic || undefined} />
+              <AvatarImage src={t.user?.image_url || undefined} />
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
@@ -40,10 +39,10 @@ export function TeachersList({ teachers }: Props) {
               <div className="text-xs text-muted-foreground truncate">{t.user?.email || "No email"}</div>
             </div>
             {t.qualification && (
-<StatusTag>
+              <StatusTag>
 
                 {t.qualification}
-</StatusTag>
+              </StatusTag>
             )}
           </Link>
         );
