@@ -25,8 +25,10 @@ export type Message = {
     content: string;
     created_at: string;
     sender?: { name: string; role: string };
+    attachments?: { url: string; name: string; type: string; size: number }[];
 };
 
+// ... (UserParticipant type)
 export type UserParticipant = {
     id: string;
     name: string;
@@ -35,6 +37,9 @@ export type UserParticipant = {
 };
 
 export async function getConversations(): Promise<Conversation[]> {
+    // ... (no change needed here as long as we don't need attachments in conversation preview yet)
+    // Actually, we might want to show "Attachment" in preview if content is empty?
+    // Let's leave it for now.
     const user = await getCurrentUser();
     if (!user) return [];
 
@@ -130,33 +135,39 @@ export async function getConversations(): Promise<Conversation[]> {
 
     // Fetch last message and calculate unread count for each conversation
     for (const conv of allConvos) {
-        const { data: lastMsg } = await supabase
-            .from("messages")
-            .select("*")
-            .eq("conversation_id", conv.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .single();
-        conv.last_message = lastMsg;
+        try {
+            const { data: lastMsg } = await supabase
+                .from("messages")
+                .select("*")
+                .eq("conversation_id", conv.id)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle(); // Use maybeSingle to avoid error if no messages
+            conv.last_message = lastMsg;
 
-        // Get user's last read time
-        const { data: participant } = await supabase
-            .from("conversation_participants")
-            .select("last_read_at")
-            .eq("conversation_id", conv.id)
-            .eq("user_id", user.id)
-            .single();
+            // Get user's last read time
+            const { data: participant } = await supabase
+                .from("conversation_participants")
+                .select("last_read_at")
+                .eq("conversation_id", conv.id)
+                .eq("user_id", user.id)
+                .maybeSingle();
 
-        const lastReadAt = participant?.last_read_at || new Date(0).toISOString();
+            const lastReadAt = participant?.last_read_at || new Date(0).toISOString();
 
-        // Count unread messages
-        const { count } = await supabase
-            .from("messages")
-            .select("id", { count: "exact", head: true })
-            .eq("conversation_id", conv.id)
-            .gt("created_at", lastReadAt);
+            // Count unread messages
+            const { count } = await supabase
+                .from("messages")
+                .select("id", { count: "exact", head: true })
+                .eq("conversation_id", conv.id)
+                .gt("created_at", lastReadAt);
 
-        conv.unread_count = count || 0;
+            conv.unread_count = count || 0;
+        } catch (err) {
+            console.error(`Error processing conversation ${conv.id}:`, err);
+            conv.last_message = null;
+            conv.unread_count = 0;
+        }
     }
 
     // Sort by last message time or updated_at
@@ -187,7 +198,11 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
     return data as Message[];
 }
 
-export async function sendMessage(conversationId: string, content: string) {
+export async function sendMessage(
+    conversationId: string,
+    content: string,
+    attachments: { url: string; name: string; type: string; size: number }[] = []
+) {
     const user = await getCurrentUser();
     if (!user) throw new Error("Unauthorized");
 
@@ -196,6 +211,7 @@ export async function sendMessage(conversationId: string, content: string) {
         conversation_id: conversationId,
         sender_id: user.id,
         content,
+        attachments,
     });
 
     if (error) throw error;

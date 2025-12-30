@@ -7,6 +7,7 @@ import { ChatWindow } from "./chat-window";
 import { AppUser } from "@/lib/auth/session";
 import { createClient } from "@supabase/supabase-js";
 import { Loader2 } from "lucide-react";
+import { supabaseClient } from "@/lib/db/supabase-client";
 
 interface ChatLayoutProps {
     initialConversations: Conversation[];
@@ -28,12 +29,7 @@ export function ChatLayout({ initialConversations, currentUser, potentialPartner
 
     // Realtime subscription
     useEffect(() => {
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
-
-        const channel = supabase
+        const channel = supabaseClient
             .channel('chat_updates')
             .on(
                 'postgres_changes',
@@ -84,7 +80,7 @@ export function ChatLayout({ initialConversations, currentUser, potentialPartner
             .subscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            supabaseClient.removeChannel(channel);
         };
     }, [selectedConversationId]);
 
@@ -111,6 +107,7 @@ export function ChatLayout({ initialConversations, currentUser, potentialPartner
             <div className={`flex-1 flex flex-col ${!selectedConversationId ? 'hidden md:flex' : 'flex'}`}>
                 {selectedConversation ? (
                     <ChatWindow
+                        key={selectedConversation.id}
                         conversation={selectedConversation}
                         currentUser={currentUser}
                         onBack={() => setSelectedConversationId(null)}

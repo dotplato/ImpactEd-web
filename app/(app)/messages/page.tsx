@@ -5,6 +5,9 @@ import { getCurrentUser } from "@/lib/auth/session";
 
 export default async function MessagesPage() {
     const user = await getCurrentUser();
+    if (!user) {
+        return <div>Please log in to view messages.</div>;
+    }
     const conversations = await getConversations();
     const potentialPartners = await getPotentialChatPartners();
 
