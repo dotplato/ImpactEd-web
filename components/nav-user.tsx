@@ -98,7 +98,10 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={async () => {
+              await fetch("/api/auth/sign-out", { method: "POST" });
+              window.location.href = "/sign-in";
+            }}>
               <IconLogout />
               Log out
             </DropdownMenuItem>

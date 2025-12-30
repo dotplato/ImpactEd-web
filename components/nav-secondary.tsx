@@ -19,6 +19,7 @@ export function NavSecondary({
     title: string
     url: string
     icon: Icon
+    badge?: number
   }[]
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
   return (
@@ -31,6 +32,11 @@ export function NavSecondary({
                 <a href={item.url}>
                   <item.icon />
                   <span>{item.title}</span>
+                  {item.badge && (
+                    <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white">
+                      {item.badge}
+                    </span>
+                  )}
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>
