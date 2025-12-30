@@ -198,16 +198,59 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
     return data as Message[];
 }
 
+export async function uploadChatAttachment(formData: FormData): Promise<{ url: string; name: string; type: string; size: number } | null> {
+    const user = await getCurrentUser();
+    if (!user) return null;
+
+    const file = formData.get('file') as File;
+    const conversationId = formData.get('conversationId') as string;
+
+    if (!file || !conversationId) return null;
+
+    const supabase = getSupabaseServerClient();
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random()}.${fileExt}`;
+    const filePath = `${conversationId}/${fileName}`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const { error: uploadError } = await supabase.storage
+        .from('chat-attachments')
+        .upload(filePath, buffer, {
+            contentType: file.type,
+            upsert: false
+        });
+
+    if (uploadError) {
+        console.error('Error uploading file:', uploadError);
+        return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+        .from('chat-attachments')
+        .getPublicUrl(filePath);
+
+    return {
+        url: publicUrl,
+        name: file.name,
+        type: file.type,
+        size: file.size
+    };
+}
+
 export async function sendMessage(
     conversationId: string,
     content: string,
-    attachments: { url: string; name: string; type: string; size: number }[] = []
+    attachments: { url: string; name: string; type: string; size: number }[] = [],
+    messageId?: string
 ) {
     const user = await getCurrentUser();
     if (!user) throw new Error("Unauthorized");
 
     const supabase = getSupabaseServerClient();
     const { error } = await supabase.from("messages").insert({
+        id: messageId,
         conversation_id: conversationId,
         sender_id: user.id,
         content,

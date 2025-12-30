@@ -75,8 +75,14 @@ export function ChatWindow({ conversation, currentUser, onBack, onMessageSent }:
                 },
                 async (payload) => {
                     const newMsg = payload.new as Message;
+                    console.log("Realtime message received:", newMsg.id);
                     setMessages(prev => {
-                        if (prev.find(m => m.id === newMsg.id)) return prev;
+                        const exists = prev.find(m => m.id === newMsg.id);
+                        if (exists) {
+                            console.log("Message already exists in state, skipping:", newMsg.id);
+                            return prev;
+                        }
+                        console.log("Adding new message from Realtime to state:", newMsg.id);
                         return [...prev, newMsg];
                     });
                     setTimeout(scrollToBottom, 100);
@@ -122,38 +128,32 @@ export function ChatWindow({ conversation, currentUser, onBack, onMessageSent }:
         if (attachments.length === 0) return [];
 
         const uploadedAttachments = [];
+        const { uploadChatAttachment } = await import("@/lib/actions/chat");
 
         for (const file of attachments) {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Math.random()}.${fileExt}`;
-            const filePath = `${conversation.id}/${fileName}`;
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('conversationId', conversation.id);
 
-            const { error: uploadError } = await supabaseClient.storage
-                .from('chat-attachments')
-                .upload(filePath, file);
-
-            if (uploadError) {
-                console.error('Error uploading file:', uploadError);
-                continue;
+            try {
+                const result = await uploadChatAttachment(formData);
+                if (result) {
+                    console.log("File uploaded:", result.name, "Public URL:", result.url);
+                    uploadedAttachments.push(result);
+                }
+            } catch (error) {
+                console.error('Error uploading file:', error);
             }
-
-            const { data: { publicUrl } } = supabaseClient.storage
-                .from('chat-attachments')
-                .getPublicUrl(filePath);
-
-            uploadedAttachments.push({
-                url: publicUrl,
-                name: file.name,
-                type: file.type,
-                size: file.size
-            });
         }
 
         return uploadedAttachments;
     };
 
+    const isSendingRef = useRef(false);
+
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSendingRef.current) return;
         if (!newMessage.trim() && attachments.length === 0) return;
 
         const content = newMessage;
@@ -162,34 +162,38 @@ export function ChatWindow({ conversation, currentUser, onBack, onMessageSent }:
         setNewMessage("");
         setAttachments([]);
         setIsUploading(true);
+        isSendingRef.current = true;
 
         try {
             const uploadedFiles = await uploadFiles();
 
             // Optimistic update
+            const messageId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+
+            console.log("Sending message with ID:", messageId);
+
             const optimisticMsg: Message = {
-                id: crypto.randomUUID(),
+                id: messageId,
                 conversation_id: conversation.id,
                 sender_id: currentUser.id,
                 content: content,
                 created_at: new Date().toISOString(),
                 sender: { name: currentUser.name || "You", role: currentUser.role },
-                attachments: uploadedFiles // Use actual URLs if possible, or placeholders? 
-                // For optimistic UI, we can't easily show local file previews as URLs without createObjectURL
-                // But since we await uploadFiles first, it's not fully optimistic in terms of "instant" send,
-                // but it ensures we have URLs.
-                // To make it truly optimistic, we'd need to upload in background.
-                // For now, let's wait for upload (loading state) then send.
+                attachments: uploadedFiles
             };
 
-            setMessages(prev => [...prev, optimisticMsg]);
+            setMessages(prev => {
+                console.log("Adding optimistic message to state");
+                return [...prev, optimisticMsg];
+            });
             setTimeout(scrollToBottom, 10);
 
             if (onMessageSent) {
                 onMessageSent(optimisticMsg);
             }
 
-            await sendMessage(conversation.id, content, uploadedFiles);
+            await sendMessage(conversation.id, content, uploadedFiles, messageId);
+            console.log("Message sent successfully");
         } catch (error) {
             console.error("Failed to send message:", error);
             // Restore state on error
@@ -197,6 +201,7 @@ export function ChatWindow({ conversation, currentUser, onBack, onMessageSent }:
             setAttachments(currentAttachments);
         } finally {
             setIsUploading(false);
+            isSendingRef.current = false;
         }
     };
 
@@ -213,7 +218,6 @@ export function ChatWindow({ conversation, currentUser, onBack, onMessageSent }:
             )}
 
             <div className="p-4 border-b flex items-center gap-3 shadow-sm bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                {/* ... Header content ... */}
                 <Button variant="ghost" size="icon" className="md:hidden" onClick={onBack}>
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
@@ -260,26 +264,50 @@ export function ChatWindow({ conversation, currentUser, onBack, onMessageSent }:
                                     )}
                                 >
                                     {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
-                                        <div className="space-y-2 mb-2">
+                                        <div className="flex flex-col gap-2 mb-2">
                                             {msg.attachments.map((att, idx) => {
-                                                if (!att || !att.url || !att.type) return null;
+                                                if (!att || !att.url) return null;
+
+                                                // Infer type if missing
+                                                const fileType = att.type || (att.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image/jpeg' : 'application/octet-stream');
+                                                const isImage = fileType.startsWith('image/');
+
                                                 return (
-                                                    <div key={idx}>
-                                                        {att.type.startsWith('image/') ? (
-                                                            <img
-                                                                src={att.url}
-                                                                alt={att.name || 'Attachment'}
-                                                                className="max-w-full rounded-lg max-h-[200px] object-cover"
-                                                            />
+                                                    <div key={idx} className="max-w-full">
+                                                        {isImage ? (
+                                                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="block">
+                                                                <img
+                                                                    src={att.url}
+                                                                    alt={att.name || 'Attachment'}
+                                                                    className="max-w-full rounded-lg max-h-[300px] object-cover border border-border/50"
+                                                                />
+                                                            </a>
                                                         ) : (
                                                             <a
                                                                 href={att.url}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
-                                                                className="flex items-center gap-2 p-2 bg-background/20 rounded hover:bg-background/30 transition-colors"
+                                                                className={cn(
+                                                                    "flex items-center gap-3 p-3 rounded-lg transition-colors border max-w-xs",
+                                                                    isMe
+                                                                        ? "bg-primary-foreground/10 border-primary-foreground/20 hover:bg-primary-foreground/20"
+                                                                        : "bg-background border-border hover:bg-accent"
+                                                                )}
                                                             >
-                                                                <FileIcon className="h-4 w-4" />
-                                                                <span className="truncate max-w-[150px]">{att.name || 'File'}</span>
+                                                                <div className={cn(
+                                                                    "p-2 rounded-full",
+                                                                    isMe ? "bg-primary-foreground/20" : "bg-muted"
+                                                                )}>
+                                                                    <FileIcon className="h-4 w-4" />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm font-medium truncate">{att.name || 'File'}</p>
+                                                                    {att.size && (
+                                                                        <p className={cn("text-xs opacity-70", isMe ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                                                                            {(att.size / 1024).toFixed(1)} KB
+                                                                        </p>
+                                                                    )}
+                                                                </div>
                                                             </a>
                                                         )}
                                                     </div>
@@ -321,6 +349,7 @@ export function ChatWindow({ conversation, currentUser, onBack, onMessageSent }:
                             onChange={(e) => {
                                 if (e.target.files) {
                                     onDrop(Array.from(e.target.files));
+                                    e.target.value = ""; // Reset input
                                 }
                             }}
                         />
