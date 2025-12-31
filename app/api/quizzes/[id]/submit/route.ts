@@ -4,7 +4,12 @@ import { getSupabaseServerClient } from "@/lib/db/supabase-server";
 import { getCurrentUser } from "@/lib/auth/session";
 
 const SubmitQuizSchema = z.object({
-    answers: z.any(), // Record<questionId, answer>
+    answers: z.record(z.string(), z.any()),
+    attachments: z.array(z.object({
+        name: z.string(),
+        url: z.string(),
+        type: z.string().optional(),
+    })).optional(),
 });
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
@@ -14,12 +19,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     const quizId = params.id;
     const body = await req.json();
+    console.log("Quiz submission received:", { quizId, attachmentsCount: body.attachments?.length });
+
     const parsed = SubmitQuizSchema.safeParse(body);
     if (!parsed.success) {
+        console.error("Quiz submission validation failed:", parsed.error.format());
         return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
-    const { answers } = parsed.data;
+    const { answers, attachments } = parsed.data;
     const supabase = getSupabaseServerClient();
 
     try {
@@ -56,7 +64,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                         score += Number(q.points || 0);
                     }
                 }
-                // For short answer, we might need manual grading or simple string match
                 else if (q.question_type === "short_answer") {
                     if (studentAnswer?.trim().toLowerCase() === q.correct_answer?.trim().toLowerCase()) {
                         score += Number(q.points || 0);
@@ -74,14 +81,37 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 answers,
                 score,
                 submitted_at: new Date().toISOString(),
-            })
+            }, { onConflict: 'quiz_id,student_id' })
             .select("id")
             .single();
 
-        if (subErr) throw new Error(subErr.message);
+        if (subErr) {
+            console.error("Submission upsert error:", subErr);
+            throw new Error(subErr.message);
+        }
+
+        // Delete old attachments if any
+        const { error: delErr } = await supabase.from("quiz_submission_attachments").delete().eq("submission_id", submission.id);
+        if (delErr) console.error("Failed to delete old attachments:", delErr);
+
+        // Insert attachments
+        if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+            const attachmentRows = attachments.map((att: any) => ({
+                submission_id: submission.id,
+                file_url: att.url,
+                file_name: att.name,
+                file_type: att.type
+            }));
+            const { error: attErr } = await supabase.from("quiz_submission_attachments").insert(attachmentRows);
+            if (attErr) {
+                console.error("Failed to save submission attachments:", attErr);
+                throw new Error("Failed to save attachments: " + attErr.message);
+            }
+        }
 
         return NextResponse.json({ ok: true, score, id: submission.id });
     } catch (e: any) {
+        console.error("Quiz submission error:", e);
         return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
     }
 }
