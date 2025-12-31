@@ -14,6 +14,8 @@ import {
   IconPlane,
   IconMessage,
   IconFiles,
+  IconQuestionMark,
+  IconAB2,
 } from "@tabler/icons-react"
 
 import { AppUser } from "@/lib/auth/session"
@@ -51,6 +53,11 @@ const getNavData = (userRole: AppUser["role"] | null) => {
       title: "Assignments",
       url: "/assignments",
       icon: IconFiles,
+    },
+    {
+      title: "Quizzes",
+      url: "/quizzes",
+      icon: IconAB2,
     },
     {
       title: "Teachers",

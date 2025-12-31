@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from "react";
 import {
-    LayoutGrid,
     Plus,
     Search,
     Check,
     Clock,
     HelpCircle,
-    X,
     Loader2,
     AlertCircle,
     Trash2,
@@ -16,6 +14,7 @@ import {
     FileIcon,
     XCircle,
     Download,
+    Eye,
 } from "lucide-react";
 import { supabaseClient } from "@/lib/db/supabase-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -899,17 +898,86 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     {role === "student" ? (
-                                                        <Button
-                                                            size="sm"
-                                                            variant={isSubmitted ? "outline" : "default"}
-                                                            disabled={isSubmitted}
-                                                            onClick={() => {
-                                                                setSelectedQuizId(q.id);
-                                                                setQuizOpen(true);
-                                                            }}
-                                                        >
-                                                            {isSubmitted ? "Submitted" : "Take Quiz"}
-                                                        </Button>
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                variant={isSubmitted ? "outline" : "default"}
+                                                                disabled={isSubmitted}
+                                                                onClick={() => {
+                                                                    setSelectedQuizId(q.id);
+                                                                    setQuizOpen(true);
+                                                                }}
+                                                            >
+                                                                {isSubmitted ? "Submitted" : "Take Quiz"}
+                                                            </Button>
+                                                            {isSubmitted && (
+                                                                <Dialog>
+                                                                    <DialogTrigger asChild>
+                                                                        <Button size="icon" variant="ghost" className="h-8 w-8">
+                                                                            <Eye className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </DialogTrigger>
+                                                                    <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                                                                        <DialogHeader>
+                                                                            <DialogTitle>Your Submission: {q.title}</DialogTitle>
+                                                                            <DialogDescription>
+                                                                                Submitted on {new Date(submission.submitted_at).toLocaleString()}
+                                                                            </DialogDescription>
+                                                                        </DialogHeader>
+                                                                        <div className="space-y-6 py-4">
+                                                                            <div className="space-y-4">
+                                                                                <h3 className="font-semibold text-sm border-b pb-2">Answers</h3>
+                                                                                {q.questions?.map((question: any, idx: number) => {
+                                                                                    const answerText = submission.answers?.[question.id];
+                                                                                    return (
+                                                                                        <div key={question.id} className="border p-4 rounded-md space-y-2">
+                                                                                            <p className="font-medium text-sm">{idx + 1}. {question.question_text}</p>
+                                                                                            <div className="bg-muted/30 p-2 rounded text-sm">
+                                                                                                <span className="font-semibold">Your Answer: </span>
+                                                                                                {answerText ? (
+                                                                                                    <span>{answerText}</span>
+                                                                                                ) : (
+                                                                                                    <span className="text-muted-foreground italic">No answer</span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                            <div className="text-xs text-muted-foreground">
+                                                                                                <span className="font-semibold">Correct Answer: </span>
+                                                                                                {question.correct_answer || "N/A"}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+
+                                                                            <div className="space-y-4">
+                                                                                <h3 className="font-semibold text-sm border-b pb-2">Attachments</h3>
+                                                                                <div className="flex flex-col gap-2">
+                                                                                    {(() => {
+                                                                                        const atts = submission.attachments || submission.quiz_submission_attachments || [];
+                                                                                        return atts.length > 0 ? (
+                                                                                            atts.map((att: any, attIdx: number) => (
+                                                                                                <a
+                                                                                                    key={attIdx}
+                                                                                                    href={att.file_url}
+                                                                                                    target="_blank"
+                                                                                                    rel="noopener noreferrer"
+                                                                                                    className="text-sm text-blue-600 hover:underline flex items-center gap-2 p-2 border rounded-md hover:bg-muted/20"
+                                                                                                >
+                                                                                                    <FileIcon className="size-4" />
+                                                                                                    {att.file_name}
+                                                                                                </a>
+                                                                                            ))
+                                                                                        ) : (
+                                                                                            <span className="text-muted-foreground text-sm italic">No attachments</span>
+                                                                                        );
+                                                                                    })()}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </DialogContent>
+                                                                </Dialog>
+                                                            )}
+                                                        </div>
                                                     ) : (
                                                         <div className="flex items-center justify-end gap-2">
                                                             <Button
@@ -923,12 +991,13 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
                                                                 Submissions
                                                             </Button>
                                                             <Button
-                                                                size="sm"
+                                                                size="icon"
                                                                 variant="ghost"
                                                                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                                                 onClick={() => onDelete(q.id)}
                                                             >
-                                                                Delete
+                                                                <Trash2 className="h-4 w-4" />
+
                                                             </Button>
                                                         </div>
                                                     )}
@@ -940,7 +1009,8 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
                         </TableBody>
                     </Table>
                 </Card>
-            )}
+            )
+            }
 
             {/* Take Quiz Dialog */}
             <Dialog open={quizOpen} onOpenChange={setQuizOpen}>
@@ -1297,6 +1367,6 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
                     </Table>
                 </DialogContent>
             </Dialog>
-        </div>
+        </div >
     );
 }
