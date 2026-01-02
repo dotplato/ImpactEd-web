@@ -32,7 +32,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-const getNavData = (userRole: AppUser["role"] | null) => {
+const getNavData = (userRole: AppUser["role"] | null, user: AppUser | null) => {
   const allNavItems = [
     {
       title: "Overview",
@@ -86,10 +86,14 @@ const getNavData = (userRole: AppUser["role"] | null) => {
   });
 
   return {
-    user: {
-      name: "shadcn",
-      email: "m@example.com",
-      avatar: "/avatars/shadcn.jpg",
+    user: user ? {
+      name: user.name || "User",
+      email: user.email,
+      avatar: user.image_url || "",
+    } : {
+      name: "User",
+      email: "",
+      avatar: "",
     },
     navMain: filteredNavItems,
     navSecondary: [
@@ -114,22 +118,22 @@ const getNavData = (userRole: AppUser["role"] | null) => {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [unreadCount, setUnreadCount] = React.useState(0);
-  const [userRole, setUserRole] = React.useState<AppUser["role"] | null>(null);
+  const [user, setUser] = React.useState<AppUser | null>(null);
 
   React.useEffect(() => {
-    const fetchUserRole = async () => {
+    const fetchUser = async () => {
       try {
         const response = await fetch("/api/me");
         const data = await response.json();
         if (data.user) {
-          setUserRole(data.user.role);
+          setUser(data.user);
         }
       } catch (error) {
-        console.error("Failed to fetch user role:", error);
+        console.error("Failed to fetch user:", error);
       }
     };
 
-    fetchUserRole();
+    fetchUser();
   }, []);
 
   React.useEffect(() => {
@@ -152,7 +156,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return () => clearInterval(interval);
   }, []);
 
-  const data = getNavData(userRole);
+  const data = getNavData(user?.role || null, user);
 
   const navSecondaryWithBadge = data.navSecondary.map(item => {
     if (item.title === "Messages" && unreadCount > 0) {

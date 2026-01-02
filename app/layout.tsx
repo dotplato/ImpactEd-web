@@ -6,8 +6,8 @@ const outfit = Outfit({
   subsets: ["latin"],
 });
 export const metadata: Metadata = {
-  title: "ImpactEd",
-  description: "ImpactEd is a virtual coaching platform for all teachers, trainers and mentors to fulfill all their coaching and mentorship needs.",
+  title: "CourseImpact",
+  description: "CourseImpact is a virtual coaching platform for all teachers, trainers and mentors to fulfill all their coaching and mentorship needs.",
 };
 
 import { Toaster } from "@/components/ui/sonner";

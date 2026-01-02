@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
     Plus,
     Search,
@@ -129,6 +129,42 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
         attachments: [] as Attachment[],
         attachmentRequired: false,
     });
+
+    const { todayQuizzes, upcomingQuizzes, pastQuizzes } = useMemo(() => {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = new Date();
+        endOfToday.setHours(23, 59, 59, 999);
+
+        const t: Quiz[] = [];
+        const u: Quiz[] = [];
+        const p: Quiz[] = [];
+
+        const filtered = selectedCourse === "all"
+            ? quizzes
+            : quizzes.filter(q => q.course?.id === selectedCourse);
+
+        for (const q of filtered) {
+            if (!q.due_at) {
+                u.push(q);
+                continue;
+            }
+            const d = new Date(q.due_at);
+            if (d >= startOfToday && d <= endOfToday) {
+                t.push(q);
+            } else if (d > endOfToday) {
+                u.push(q);
+            } else {
+                p.push(q);
+            }
+        }
+
+        t.sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime());
+        u.sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime());
+        p.sort((a, b) => new Date(b.due_at!).getTime() - new Date(a.due_at!).getTime());
+
+        return { todayQuizzes: t, upcomingQuizzes: u, pastQuizzes: p };
+    }, [quizzes, selectedCourse]);
 
     const canCreate = role === "admin" || role === "teacher";
 
@@ -315,6 +351,124 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
         } catch (err: any) {
             toast.error(err.message);
         }
+    }
+
+    function renderQuizTable(list: Quiz[], emptyMessage: string) {
+        if (list.length === 0) {
+            return <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg border-dashed">{emptyMessage}</p>;
+        }
+
+        return (
+            <Card className="px-2">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Quiz</TableHead>
+                            <TableHead>Course</TableHead>
+                            <TableHead>Due Date</TableHead>
+                            <TableHead>Marks</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {list.map((q) => {
+                            const sub = submissions[q.id];
+                            const isSubmitted = !!sub;
+
+                            return (
+                                <TableRow key={q.id}>
+                                    <TableCell className="font-medium">
+                                        <div className="flex items-center gap-2">
+                                            <HelpCircle className="size-4 text-primary" />
+                                            {q.title}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>{q.course?.title || "-"}</TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <Clock className="size-3.5 text-muted-foreground" />
+                                            {q.due_at ? new Date(q.due_at).toLocaleString([], {
+                                                dateStyle: "medium",
+                                                timeStyle: "short",
+                                            }) : "No deadline"}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {q.total_marks ? (
+                                            <Badge variant="outline" className="font-mono">
+                                                {sub?.score !== undefined && sub?.score !== null ? sub.score : "-"} / {q.total_marks}
+                                            </Badge>
+                                        ) : "-"}
+                                    </TableCell>
+                                    <TableCell>
+                                        {isSubmitted ? (
+                                            <div className="flex items-center gap-2">
+                                                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Submitted</Badge>
+                                                {role === "student" && (
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="size-7 text-muted-foreground hover:text-primary"
+                                                        onClick={() => {
+                                                            setSelectedQuizId(q.id);
+                                                            setViewOpen(true);
+                                                        }}
+                                                    >
+                                                        <Eye className="size-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <Badge variant="secondary">Pending</Badge>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            {role === "student" && !isSubmitted && (
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setSelectedQuizId(q.id);
+                                                        setQuizOpen(true);
+                                                        setQuizAnswers({});
+                                                    }}
+                                                >
+                                                    Take Quiz
+                                                </Button>
+                                            )}
+                                            {(role === "admin" || role === "teacher") && (
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            setSelectedQuizId(q.id);
+                                                            setSubmissionsOpen(true);
+                                                        }}
+                                                    >
+                                                        Submissions
+                                                    </Button>
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                        onClick={() => onDelete(q.id)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </Card>
+        );
     }
 
     async function handleUpdateScore(submissionId: string, newScore: number) {
@@ -815,8 +969,8 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
                                     </div>
 
                                     <DialogFooter>
-                                        <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-                                        <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={!form.title || !form.courseId || form.selectedStudents.length === 0}>
+                                        <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                                        <Button type="submit" disabled={!form.title || !form.courseId || form.selectedStudents.length === 0}>
                                             Save Quiz
                                         </Button>
                                     </DialogFooter>
@@ -1103,7 +1257,7 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => {
+                            <Button type="button" variant="outline" onClick={() => {
                                 setQuizOpen(false);
                                 setSubmissionAttachments([]);
                             }}>Cancel</Button>
