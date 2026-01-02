@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import * as Dialog from '@radix-ui/react-dialog';
-import { CourseCard } from "@/components/cards/CourseCard";
+import { CourseCard } from "@/components/course/CourseCard";
 
 type UserRole = "admin" | "teacher" | "student" | null;
 
