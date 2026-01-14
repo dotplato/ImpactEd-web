@@ -44,7 +44,8 @@ export async function GET() {
                 teacher:teachers(
                     id,
                     user:users(id, name, email, image_url)
-                )
+                ),
+                students:course_students(id)
             `)
             .eq("teacher_id", teacher.id)
             .order("created_at", { ascending: false });
@@ -53,7 +54,13 @@ export async function GET() {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        return NextResponse.json({ courses });
+        // Transform to include student count
+        const coursesWithCount = (courses || []).map((c: any) => ({
+            ...c,
+            studentCount: Array.isArray(c.students) ? c.students.length : 0,
+        }));
+
+        return NextResponse.json({ courses: coursesWithCount });
     }
 
     // Admin sees all courses
@@ -64,7 +71,8 @@ export async function GET() {
             teacher:teachers(
                 id,
                 user:users(id, name, email, image_url)
-            )
+            ),
+            students:course_students(id)
         `)
         .order("created_at", { ascending: false });
 
@@ -72,7 +80,13 @@ export async function GET() {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ courses });
+    // Transform to include student count
+    const coursesWithCount = (courses || []).map((c: any) => ({
+        ...c,
+        studentCount: Array.isArray(c.students) ? c.students.length : 0,
+    }));
+
+    return NextResponse.json({ courses: coursesWithCount });
 }
 
 export async function POST(req: Request) {

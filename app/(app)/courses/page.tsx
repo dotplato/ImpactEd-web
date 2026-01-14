@@ -1,16 +1,46 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import * as Dialog from '@radix-ui/react-dialog';
 import { CourseCard } from "@/components/course/CourseCard";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Plus, BookOpen, Loader2, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type UserRole = "admin" | "teacher" | "student" | null;
 
+type Course = {
+  id: string;
+  title: string;
+  description?: string | null;
+  category?: string | null;
+  level?: string | null;
+  cover_image?: string | null;
+  teacher?: {
+    id: string;
+    user?: {
+      id: string;
+      name: string | null;
+      email: string | null;
+      image_url?: string | null;
+    } | null;
+  } | null;
+  students?: Array<{ id: string }> | null;
+  studentCount?: number;
+};
+
 export default function CoursesPage() {
-  const [courses, setCourses] = useState<any[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [editCourse, setEditCourse] = useState<any | null>(null);
+  const [editCourse, setEditCourse] = useState<Course | null>(null);
   const [userRole, setUserRole] = useState<UserRole>(null);
 
   useEffect(() => {
@@ -28,15 +58,46 @@ export default function CoursesPage() {
   async function loadCourses() {
     setLoading(true);
     setError(null);
-    const res = await fetch("/api/courses");
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data?.error || 'Failed to fetch courses');
+    try {
+      const res = await fetch("/api/courses");
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.error || 'Failed to fetch courses');
+        return;
+      }
+      
+      // Transform courses to handle teacher data structure and student count
+      const transformedCourses = (data.courses || []).map((c: any) => {
+        // Handle teacher data - it can be an object with user nested inside
+        let teacherUser = null;
+        if (c.teacher?.user) {
+          teacherUser = c.teacher.user;
+        }
+        
+        // Get student count from course_students relationship
+        let studentCount = 0;
+        if (Array.isArray(c.students)) {
+          studentCount = c.students.length;
+        } else if (c.students && typeof c.students === 'object' && c.students.length !== undefined) {
+          studentCount = c.students.length;
+        }
+        
+        return {
+          ...c,
+          teacher: c.teacher ? {
+            id: c.teacher.id,
+            user: teacherUser,
+          } : null,
+          studentCount,
+        };
+      });
+      
+      setCourses(transformedCourses);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch courses');
+    } finally {
       setLoading(false);
-      return;
     }
-    setCourses(data.courses || []);
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -47,47 +108,75 @@ export default function CoursesPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this course?')) return;
-    const res = await fetch(`/api/courses/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      loadCourses();
-    } else {
-      const data = await res.json();
-      alert(data?.error || 'Failed to delete course');
+    try {
+      const res = await fetch(`/api/courses/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        loadCourses();
+      } else {
+        const data = await res.json();
+        alert(data?.error || 'Failed to delete course');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete course');
     }
   }
 
-  const canCreate = userRole === "admin";
+  const canCreate = userRole === "admin" || userRole === "teacher";
   const canEdit = userRole === "admin";
   const canDelete = userRole === "admin";
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-7xl mx-auto py-8 px-4 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Courses</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage and view all your courses
+          </p>
+        </div>
         {canCreate && (
-          <Link className="border rounded px-3 py-2 hover:bg-gray-50" href="/courses/new">+ Create course</Link>
+          <Button asChild>
+            <Link href="/courses/new">
+              <Plus className="size-4 mr-2" />
+              Create Course
+            </Link>
+          </Button>
         )}
       </div>
 
-      {error && <div className="text-red-600 text-sm">{error}</div>}
+      {/* Error State */}
+      {error && (
+        <Card className="border-destructive/50 bg-destructive/10">
+          <CardContent className="p-4 flex items-center gap-3">
+            <AlertCircle className="size-5 text-destructive shrink-0" />
+            <div className="text-sm text-destructive">{error}</div>
+          </CardContent>
+        </Card>
+      )}
 
+      {/* Loading State */}
       {loading ? (
-        <div className="text-sm text-muted-foreground">Loading courses...</div>
-      ) : courses.length ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {courses.map((c: any) => {
-            let tUser = null;
-            if (c.teacher && Array.isArray(c.teacher) && c.teacher.length && c.teacher[0]?.user) {
-              tUser = c.teacher[0].user;
-            } else if (c.teacher?.user) {
-              tUser = c.teacher.user;
-            }
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">Loading courses...</span>
+        </div>
+      ) : courses.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {courses.map((c) => {
+            const teacherUser = c.teacher?.user;
             return (
               <CourseCard
                 key={c.id}
                 id={c.id}
                 title={c.title}
-                teacherName={tUser?.name ?? null}
-                teacherEmail={tUser?.email ?? null}
+                coverImage={c.cover_image}
+                category={c.category}
+                level={c.level}
+                teacherName={teacherUser?.name ?? null}
+                teacherAvatarUrl={teacherUser?.image_url ?? null}
+                teacherEmail={teacherUser?.email ?? null}
+                studentCount={c.studentCount}
                 onEdit={canEdit ? () => setEditCourse(c) : undefined}
                 onDelete={canDelete ? () => handleDelete(c.id) : undefined}
               />
@@ -95,25 +184,43 @@ export default function CoursesPage() {
           })}
         </div>
       ) : (
-        <div className="text-sm text-muted-foreground">No courses yet</div>
+        <Card>
+          <CardContent className="p-12 text-center">
+            <BookOpen className="size-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-lg font-semibold mb-2">No courses yet</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {canCreate 
+                ? "Get started by creating your first course."
+                : "No courses have been created yet."}
+            </p>
+            {canCreate && (
+              <Button asChild>
+                <Link href="/courses/new">
+                  <Plus className="size-4 mr-2" />
+                  Create Your First Course
+                </Link>
+              </Button>
+            )}
+          </CardContent>
+        </Card>
       )}
 
-      {/* Edit Modal (stub) */}
-      <Dialog.Root open={!!editCourse} onOpenChange={(open) => !open && setEditCourse(null)}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-w-md w-full -translate-x-1/2 -translate-y-1/2 p-6 rounded-lg bg-white shadow-lg">
-            <Dialog.Title className="text-lg font-semibold">Edit Course</Dialog.Title>
-            <div className="mt-3 text-xs text-gray-400">Edit course feature coming soon.</div>
-            <div className="flex justify-end mt-4">
-              <button className="px-4 py-2 rounded bg-gray-100 text-gray-800 hover:bg-gray-200" onClick={() => setEditCourse(null)}>
-                Close
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal> 
-      </Dialog.Root>
+      {/* Edit Modal */}
+      <Dialog open={!!editCourse} onOpenChange={(open) => !open && setEditCourse(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Course</DialogTitle>
+            <DialogDescription>
+              Edit course feature coming soon.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button variant="outline" onClick={() => setEditCourse(null)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-

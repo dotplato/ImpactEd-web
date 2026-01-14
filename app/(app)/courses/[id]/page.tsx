@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ import {
   GripVertical
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Check } from "lucide-react";
 
@@ -100,9 +100,32 @@ type FileRow = {
 export default function CourseDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const courseId = params?.id as string;
 
-  const [activeTab, setActiveTab] = useState<"overview" | "schedule" | "files">("overview");
+  // Get initial tab from URL query param
+  const initialTab = (searchParams.get("tab") as "overview" | "schedule" | "files") || "overview";
+  const [activeTab, setActiveTab] = useState<"overview" | "schedule" | "files">(initialTab);
+
+  // Update tab when URL param changes
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "schedule" || tab === "files" || tab === "overview") {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  // Handle tab change and update URL
+  function handleTabChange(tab: "overview" | "schedule" | "files") {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "overview") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+    router.push(`/courses/${courseId}${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
+  }
 
   const [course, setCourse] = useState<CourseDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,7 +142,8 @@ export default function CourseDetailPage() {
 
   const [userRole, setUserRole] = useState<"admin" | "teacher" | "student" | null>(null);
 
-  // Create session form
+  // Create session dialog state
+  const [createSessionOpen, setCreateSessionOpen] = useState(false);
   const [form, setForm] = useState({
     title: "",
     scheduledAt: "",
@@ -129,6 +153,7 @@ export default function CourseDetailPage() {
 
   const [studentSearch, setStudentSearch] = useState("");
   const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
+  const [enrolledStudents, setEnrolledStudents] = useState<Array<{ id: string; name: string; email: string; image_url?: string | null }>>([]);
 
   useEffect(() => {
     fetch("/api/me")
@@ -554,9 +579,203 @@ export default function CourseDetailPage() {
           </div>
         </div>
         {canCreateSession && (
-          <Button variant="outline" size="sm">
-            <Plus className="size-4 mr-2" /> Add Session
-          </Button>
+          <Dialog open={createSessionOpen} onOpenChange={setCreateSessionOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Plus className="size-4 mr-2" /> Add Session
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Create Session</DialogTitle>
+                <DialogDescription>
+                  Schedule a new learning session for this course.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={onCreateSession} className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Students</Label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex -space-x-2 overflow-hidden">
+                        {form.selectedStudents.slice(0, 5).map(id => {
+                          const student = enrolledStudents.find(s => s.id === id);
+                          if (!student) return null;
+                          return (
+                            <Avatar key={id} className="size-7 border-2 border-background">
+                              <AvatarImage src={student.image_url || undefined} />
+                              <AvatarFallback className="text-[10px]">{student.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                          );
+                        })}
+                        {form.selectedStudents.length > 5 && (
+                          <div className="flex size-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-medium">
+                            +{form.selectedStudents.length - 5}
+                          </div>
+                        )}
+                      </div>
+                      <Dialog open={selectionDialogOpen} onOpenChange={setSelectionDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="size-8 rounded-full border-primary text-primary hover:bg-primary/10"
+                          >
+                            <Plus className="size-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden gap-0">
+                          <DialogHeader className="p-6 pb-2">
+                            <DialogTitle>Select Students</DialogTitle>
+                            <DialogDescription>
+                              Invite students to this session. This will create a group session.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="p-4 pt-2 border-b">
+                            <div className="relative">
+                              <Search className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
+                              <Input
+                                placeholder="Search students..."
+                                className="pl-8 h-9 bg-background"
+                                value={studentSearch}
+                                onChange={(e) => setStudentSearch(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="h-80 overflow-y-auto">
+                            <div className="divide-y">
+                              <div
+                                className="flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                                onClick={() => {
+                                  const allSelected = form.selectedStudents.length === enrolledStudents.length;
+                                  setForm((f) => ({
+                                    ...f,
+                                    selectedStudents: allSelected ? [] : enrolledStudents.map(s => s.id),
+                                  }));
+                                }}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <Check className={cn("size-4 text-primary transition-opacity", form.selectedStudents.length === enrolledStudents.length ? "opacity-100" : "opacity-0")} />
+                                  </div>
+                                  <span className="font-medium">Select All</span>
+                                </div>
+                                <Checkbox
+                                  checked={form.selectedStudents.length === enrolledStudents.length}
+                                  className="pointer-events-none"
+                                />
+                              </div>
+                              {enrolledStudents
+                                .filter(s =>
+                                  s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                                  s.email.toLowerCase().includes(studentSearch.toLowerCase())
+                                )
+                                .map(s => {
+                                  const isSelected = form.selectedStudents.includes(s.id);
+                                  return (
+                                    <div
+                                      key={s.id}
+                                      className={cn(
+                                        "flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer transition-colors",
+                                        isSelected && "bg-primary/5"
+                                      )}
+                                      onClick={() => {
+                                        setForm((f) => ({
+                                          ...f,
+                                          selectedStudents: isSelected
+                                            ? f.selectedStudents.filter(id => id !== s.id)
+                                            : [...f.selectedStudents, s.id],
+                                        }));
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <Avatar className="size-8">
+                                          <AvatarImage src={s.image_url || undefined} />
+                                          <AvatarFallback>{s.name.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex flex-col">
+                                          <span className="text-sm font-medium">{s.name}</span>
+                                          <span className="text-xs text-muted-foreground">{s.email}</span>
+                                        </div>
+                                      </div>
+                                      {isSelected && <Check className="size-4 text-primary" />}
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                          <div className="p-4 border-t bg-muted/10 flex items-center justify-between gap-4">
+                            <div className="flex -space-x-2 overflow-hidden no-scrollbar">
+                              {form.selectedStudents.map(id => {
+                                const student = enrolledStudents.find(s => s.id === id);
+                                if (!student) return null;
+                                return (
+                                  <Avatar key={id} className="size-8 border-2 border-background">
+                                    <AvatarImage src={student.image_url || undefined} />
+                                    <AvatarFallback className="text-xs">{student.name.charAt(0)}</AvatarFallback>
+                                  </Avatar>
+                                );
+                              })}
+                            </div>
+                            <Button
+                              type="button"
+                              className="bg-purple-700 hover:bg-purple-800 text-white px-8"
+                              onClick={() => setSelectionDialogOpen(false)}
+                            >
+                              Continue
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="title">Title (Optional)</Label>
+                  <Input
+                    id="title"
+                    value={form.title}
+                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder="Session title"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="start">Start Time</Label>
+                    <Input
+                      id="start"
+                      type="datetime-local"
+                      required
+                      value={form.scheduledAt}
+                      onChange={(e) => setForm((f) => ({ ...f, scheduledAt: e.target.value }))}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="duration">Duration (minutes)</Label>
+                    <Input
+                      id="duration"
+                      type="number"
+                      min={1}
+                      value={form.duration}
+                      onChange={(e) => setForm((f) => ({ ...f, duration: Number(e.target.value) || 60 }))}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setCreateSessionOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={form.selectedStudents.length === 0}>
+                    Create Session
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
 
@@ -582,7 +801,7 @@ export default function CourseDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Content Area */}
         <div className="lg:col-span-3 space-y-6">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+          <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as "overview" | "schedule" | "files")} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="schedule">Schedule</TabsTrigger>
@@ -624,49 +843,6 @@ export default function CourseDetailPage() {
 
             {/* Schedule Tab - Combined Curriculum & Schedule */}
             <TabsContent value="schedule" className="space-y-6 mt-6">
-              {canCreateSession && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Create New Session</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <form className="grid gap-4" onSubmit={onCreateSession}>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label>Title (Optional)</Label>
-                          <Input
-                            placeholder="Session title"
-                            value={form.title}
-                            onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>When</Label>
-                          <Input
-                            type="datetime-local"
-                            value={form.scheduledAt}
-                            onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value }))}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Duration (minutes)</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            value={form.duration}
-                            onChange={e => setForm(f => ({ ...f, duration: Number(e.target.value) || 60 }))}
-                          />
-                        </div>
-                      </div>
-                      <Button type="submit" className="w-full md:w-auto">
-                        <Plus className="size-4 mr-2" /> Create Session
-                      </Button>
-                    </form>
-                  </CardContent>
-                </Card>
-              )}
-
               {sessionsLoading ? (
                 <Card>
                   <CardContent className="p-12 text-center text-muted-foreground">
