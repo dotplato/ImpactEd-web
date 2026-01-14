@@ -33,6 +33,8 @@ export default function NewCoursePage() {
   const [description, setDescription] = useState("");
   const [whatStudentsWillLearn, setWhatStudentsWillLearn] = useState<string[]>([""]);
   const [coverImage, setCoverImage] = useState("");
+  const [tenureStart, setTenureStart] = useState("");
+  const [tenureEnd, setTenureEnd] = useState("");
 
   // Upload state
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -254,6 +256,8 @@ export default function NewCoursePage() {
           description,
           whatStudentsWillLearn: whatStudentsWillLearn.filter(p => p.trim() !== ""),
           coverImage,
+          tenureStart: tenureStart || null,
+          tenureEnd: tenureEnd || null,
           studentIds: selectedStudents,
           curriculum: sections // Send curriculum data to be processed as sessions
         }),
@@ -466,6 +470,29 @@ export default function NewCoursePage() {
                     ref={fileInputRef}
                     onChange={handleFileChange}
                     accept="image/*"
+                  />
+                </div>
+              </div>
+
+              {/* Tenure Dates */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label className="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Start Date</Label>
+                  <Input
+                    type="date"
+                    className="h-11"
+                    value={tenureStart}
+                    onChange={e => setTenureStart(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">End Date</Label>
+                  <Input
+                    type="date"
+                    className="h-11"
+                    value={tenureEnd}
+                    onChange={e => setTenureEnd(e.target.value)}
+                    min={tenureStart || undefined}
                   />
                 </div>
               </div>
