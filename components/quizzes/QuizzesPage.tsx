@@ -203,7 +203,7 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
 
     async function preloadCoursesAndStudents() {
         try {
-            const res = await fetch("/api/admin/courses");
+            const res = await fetch("/api/courses");
             if (!res.ok) return;
             const payload = await res.json();
             const list = payload?.courses ?? payload ?? [];
@@ -213,7 +213,7 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
             const studentsEntries: [string, Student[]][] = await Promise.all(
                 mapped.map(async (course: any) => {
                     try {
-                        const r = await fetch(`/api/admin/courses/${course.id}/students`);
+                        const r = await fetch(`/api/courses/${course.id}/students`);
                         if (!r.ok) return [course.id, []] as [string, Student[]];
                         const p = await r.json();
                         return [course.id, (p.students || []) as Student[]] as [string, Student[]];

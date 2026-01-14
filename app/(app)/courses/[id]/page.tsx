@@ -71,7 +71,7 @@ export default function CourseDetailPage() {
   async function loadCourse() {
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/admin/courses/${courseId}`);
+    const res = await fetch(`/api/courses/${courseId}`);
     const data = await res.json();
     if (!res.ok) {
       setError(data?.error || "Failed to load course");
@@ -84,7 +84,7 @@ export default function CourseDetailPage() {
 
   async function loadSessions() {
     setSessionsLoading(true);
-    const res = await fetch(`/api/admin/courses/${courseId}/sessions`);
+    const res = await fetch(`/api/courses/${courseId}/sessions`);
     const data = await res.json();
     if (res.ok) setSessions(data.sessions || []);
     setSessionsLoading(false);
@@ -92,7 +92,7 @@ export default function CourseDetailPage() {
 
   async function loadFiles() {
     setFilesLoading(true);
-    const res = await fetch(`/api/admin/courses/${courseId}/files`);
+    const res = await fetch(`/api/courses/${courseId}/files`);
     const data = await res.json();
     if (res.ok) setFiles(data.files || []);
     setFilesLoading(false);
@@ -166,7 +166,7 @@ export default function CourseDetailPage() {
     setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch(`/api/admin/courses/${courseId}/files`, { method: "POST", body: formData });
+    const res = await fetch(`/api/courses/${courseId}/files`, { method: "POST", body: formData });
     if (res.ok) {
       await loadFiles();
     }
@@ -176,7 +176,7 @@ export default function CourseDetailPage() {
 
   async function onDeleteFile(id: string) {
     if (!confirm("Delete this file?")) return;
-    const res = await fetch(`/api/admin/courses/${courseId}/files/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/courses/${courseId}/files/${id}`, { method: "DELETE" });
     if (res.ok) loadFiles();
   }
 

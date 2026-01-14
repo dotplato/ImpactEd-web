@@ -1,0 +1,359 @@
+# Cursor Rules for Impacted Platform 2
+
+## Project Context
+This is a Next.js 15 application using React 19, TypeScript, Tailwind CSS v4, shadcn/ui (New York style), and Supabase. Follow these rules strictly to maintain consistency.
+
+## Code Style & Formatting
+
+### TypeScript
+- Use strict TypeScript mode
+- Always define types/interfaces before components
+- Use `type` for props: `type Props = { ... }`
+- Prefer explicit types over `any`
+- Use optional chaining (`?.`) and nullish coalescing (`??`)
+- Handle null/undefined explicitly: `string | null`, `{ id: string } | null`
+
+### File Naming
+- Components: PascalCase (`CourseCard.tsx`)
+- Pages: `page.tsx`, `layout.tsx`, `route.ts`
+- Utilities: camelCase (`utils.ts`, `supabase-server.ts`)
+- Hooks: kebab-case with `use-` prefix (`use-mobile.ts`)
+
+### Component Structure
+1. `"use client"` directive if needed (top of file)
+2. External imports (React, Next.js, libraries)
+3. Internal imports (`@/components`, `@/lib`)
+4. Type definitions
+5. Component function
+6. Exports
+
+## Next.js Patterns
+
+### Client vs Server Components
+- **Client Components**: Add `"use client"` for hooks, interactivity, browser APIs
+- **Server Components**: Default (no directive) for data fetching, server logic
+- Prefer Server Components when possible
+
+### API Routes
+- Use `NextResponse.json()` for responses
+- Always wrap in try-catch
+- Return proper HTTP status codes
+- Use Zod for validation
+- Error format: `{ error: "message" }`
+- Success format: `{ ok: true, data: ... }`
+
+Example:
+```tsx
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+const Schema = z.object({ email: z.string().email() });
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const parsed = Schema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+    // ... implementation
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+  }
+}
+```
+
+### Route Organization
+- Use route groups: `(app)` for protected routes, `(auth)` for auth routes
+- Dynamic routes: `[id]/page.tsx`
+- API routes: `app/api/[resource]/route.ts`
+
+## Styling with Tailwind CSS v4
+
+### Class Utilities
+- **Always** use `cn()` from `@/lib/utils` for conditional classes
+- Use semantic color tokens: `text-muted-foreground`, `bg-primary`, `border-border`
+- Prefer Tailwind utilities over custom CSS
+
+```tsx
+import { cn } from "@/lib/utils";
+
+<div className={cn(
+  "border rounded-lg p-4 space-y-2",
+  isActive && "bg-accent",
+  className
+)}>
+```
+
+### Spacing & Layout
+- Use Tailwind spacing: `space-y-4`, `gap-2`, `p-6`
+- Responsive: `md:grid-cols-2`, `lg:col-span-3`
+- Grid: `grid grid-cols-1 lg:grid-cols-4 gap-6`
+
+### Colors
+- Background: `bg-background`, `bg-card`, `bg-muted`
+- Text: `text-foreground`, `text-muted-foreground`
+- Borders: `border-border`, `border-input`
+- Semantic: `text-destructive`, `bg-primary`, `text-primary-foreground`
+
+## shadcn/ui Components
+
+### Import Pattern
+```tsx
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+```
+
+### Component Usage
+- Use variant props: `variant="outline"`, `variant="ghost"`, `variant="destructive"`
+- Use size props: `size="sm"`, `size="lg"`, `size="icon"`
+- Use `asChild` for composition with Next.js Link
+
+```tsx
+<Button variant="outline" size="sm" asChild>
+  <Link href="/courses">Courses</Link>
+</Button>
+```
+
+### Available Components
+- `Button`, `Card`, `Dialog`, `Sheet`, `Table`
+- `Input`, `Textarea`, `Select`, `Checkbox`
+- `Avatar`, `Badge`, `Tabs`, `Skeleton`
+- `Sidebar`, `DropdownMenu`, `Tooltip`
+
+## Database (Supabase)
+
+### Client Usage
+```tsx
+import { getSupabaseServerClient } from "@/lib/db/supabase-server";
+
+const supabase = getSupabaseServerClient();
+```
+
+### Query Patterns
+- Use `.maybeSingle()` for optional results
+- Use `.single()` for required results
+- Always handle errors
+- Lowercase emails: `.eq("email", email.toLowerCase())`
+
+```tsx
+const { data, error } = await supabase
+  .from("users")
+  .select("id, email, role")
+  .eq("email", email.toLowerCase())
+  .maybeSingle();
+
+if (error || !data) {
+  return NextResponse.json({ error: "Not found" }, { status: 404 });
+}
+```
+
+## State Management
+
+### useState Pattern
+```tsx
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
+const [data, setData] = useState<DataType | null>(null);
+```
+
+### Form State
+```tsx
+const [form, setForm] = useState({
+  title: "",
+  scheduledAt: "",
+  duration: 60,
+});
+
+// Update pattern
+setForm((f) => ({ ...f, title: e.target.value }));
+```
+
+### useMemo for Computed Values
+```tsx
+const filteredItems = useMemo(() => {
+  return items.filter(item => item.active);
+}, [items]);
+```
+
+## Form Handling
+
+### Controlled Inputs
+```tsx
+<input
+  className="w-full border rounded px-2 py-1 text-sm"
+  value={form.title}
+  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+  placeholder="Enter title"
+/>
+```
+
+### Form Submission
+```tsx
+async function onSubmit(e: React.FormEvent) {
+  e.preventDefault();
+  setError(null);
+  
+  const res = await fetch("/api/endpoint", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(form),
+  });
+  
+  const data = await res.json();
+  if (!res.ok) {
+    setError(data?.error || "Failed");
+    return;
+  }
+  
+  // Success handling
+  setForm({ title: "", scheduledAt: "", duration: 60 });
+}
+```
+
+## Authentication & Authorization
+
+### Roles
+- Types: `"admin" | "teacher" | "student"`
+- Check permissions: `userRole === "admin" || userRole === "teacher"`
+- Fetch user: `/api/me` endpoint
+
+### Protected Routes
+- Middleware handles authentication
+- Check roles in components for UI conditional rendering
+
+## Icons
+
+### Lucide React (Primary)
+```tsx
+import { BookOpen, Video, FileText, Trash, Pencil } from "lucide-react";
+<BookOpen className="size-5" />
+```
+
+### Tabler Icons (Secondary)
+```tsx
+import { IconHome, IconUsers } from "@tabler/icons-react";
+<IconHome className="size-5" />
+```
+
+## Path Aliases
+
+Use these aliases (configured in tsconfig.json):
+- `@/components` → components/
+- `@/lib` → lib/
+- `@/hooks` → hooks/
+- `@/app` → app/
+
+## Error Handling
+
+### API Routes
+```tsx
+try {
+  // operation
+} catch (e: any) {
+  return NextResponse.json(
+    { error: String(e?.message || e) },
+    { status: 500 }
+  );
+}
+```
+
+### Components
+```tsx
+{error && (
+  <div className="text-red-600 text-sm">{error}</div>
+)}
+```
+
+### Loading States
+```tsx
+{loading ? (
+  <div className="text-sm text-muted-foreground">Loading...</div>
+) : (
+  // content
+)}
+```
+
+## Common Patterns
+
+### Conditional Rendering
+```tsx
+{canEdit && (
+  <button onClick={onEdit}>Edit</button>
+)}
+
+{items.length > 0 ? (
+  <ul>{items.map(...)}</ul>
+) : (
+  <div className="text-sm text-muted-foreground">No items</div>
+)}
+```
+
+### Tab Navigation
+```tsx
+const [activeTab, setActiveTab] = useState<"overview" | "schedule">("overview");
+
+<button
+  className={cn(
+    "px-3 py-2 text-sm",
+    activeTab === "overview" && "border-b-2 border-foreground font-medium"
+  )}
+  onClick={() => setActiveTab("overview")}
+>
+  Overview
+</button>
+```
+
+### Date Formatting
+```tsx
+{new Date(dateString).toLocaleString()}
+{new Date(dateString).toLocaleDateString()}
+```
+
+## Code Quality Rules
+
+1. **Always handle errors** - Use try-catch, check for null/undefined
+2. **Show loading states** - Provide user feedback during async operations
+3. **Type everything** - No `any` types, define interfaces for all data structures
+4. **Use semantic HTML** - Prefer semantic elements over divs when appropriate
+5. **Accessibility** - Use proper ARIA labels, keyboard navigation
+6. **Performance** - Use `useMemo` for expensive computations, avoid unnecessary re-renders
+7. **Code organization** - Group related code, keep components focused
+8. **Comments** - Only add comments for complex logic, code should be self-documenting
+
+## When Creating New Features
+
+1. **Check existing patterns** - Look at similar features for consistency
+2. **Use path aliases** - Always use `@/` imports
+3. **Follow file structure** - Place files in appropriate directories
+4. **Add types** - Define TypeScript types before implementation
+5. **Handle errors** - Always include error handling
+6. **Add loading states** - Show loading indicators
+7. **Use shadcn/ui** - Prefer existing UI components over custom ones
+8. **Test locally** - Verify functionality before committing
+
+## Prohibited Patterns
+
+- ❌ Don't use `any` type without good reason
+- ❌ Don't skip error handling
+- ❌ Don't create custom components when shadcn/ui has equivalents
+- ❌ Don't use inline styles (use Tailwind classes)
+- ❌ Don't forget `"use client"` directive for client components
+- ❌ Don't mix server and client component patterns incorrectly
+- ❌ Don't use relative imports when path aliases are available
+- ❌ Don't skip TypeScript types
+
+## Preferred Patterns
+
+- ✅ Use `cn()` for conditional classes
+- ✅ Use semantic Tailwind color tokens
+- ✅ Use shadcn/ui components
+- ✅ Use path aliases (`@/components`, `@/lib`)
+- ✅ Use TypeScript strict mode
+- ✅ Use Zod for validation
+- ✅ Use `useMemo` for computed values
+- ✅ Use proper error handling
+- ✅ Use loading states
+- ✅ Use role-based access control
+

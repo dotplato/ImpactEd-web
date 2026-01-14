@@ -161,7 +161,7 @@ export default function SessionsPage({ role }: Props) {
 
   async function preloadCoursesAndStudents() {
     if (!canCreate) return;
-    const res = await fetch("/api/admin/courses", { method: "GET" });
+    const res = await fetch("/api/courses", { method: "GET" });
     if (!res.ok) return;
     const payload = await res.json();
     const list = payload?.courses ?? payload ?? [];
@@ -174,7 +174,7 @@ export default function SessionsPage({ role }: Props) {
     const studentsEntries: [string, { id: string, name: string, email: string }[]][] = await Promise.all(
       mapped.map(async (course) => {
         try {
-          const r = await fetch(`/api/admin/courses/${course.id}/students`, { method: "GET" });
+          const r = await fetch(`/api/courses/${course.id}/students`, { method: "GET" });
           if (!r.ok) return [course.id, []] as [string, { id: string, name: string, email: string }[]];
           const p = await r.json();
           return [course.id, (p.students || []) as { id: string, name: string, email: string }[]] as [string, { id: string, name: string, email: string }[]];
@@ -200,7 +200,7 @@ export default function SessionsPage({ role }: Props) {
     }
     // Fallback fetch if not present (should rarely happen)
     try {
-      const res = await fetch(`/api/admin/courses/${courseId}/students`, { method: "GET" });
+      const res = await fetch(`/api/courses/${courseId}/students`, { method: "GET" });
       if (res.ok) {
         const payload = await res.json();
         const list = payload.students || [];

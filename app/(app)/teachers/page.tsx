@@ -43,7 +43,7 @@ export default function TeachersPage() {
   }
   async function loadTeachers() {
     setLoading(true); setError(null);
-    const res = await fetch("/api/admin/teachers");
+    const res = await fetch("/api/teachers");
     const data = await res.json();
     setTeachers(res.ok ? (data.teachers ?? []) : []);
     setLoading(false);
@@ -73,7 +73,7 @@ export default function TeachersPage() {
       if (upErr) { setError('Upload failed.'); return; }
       avatarUrl = supabase.storage.from('avatars').getPublicUrl(fileName).data.publicUrl;
     }
-    const apiRes = await fetch('/api/admin/teachers', {
+    const apiRes = await fetch('/api/teachers', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: form.name,
@@ -102,7 +102,7 @@ export default function TeachersPage() {
       if (upErr) { setEditError('Upload failed: ' + upErr.message); return; }
       avatarUrl = supabase.storage.from('avatars').getPublicUrl(fileName).data.publicUrl;
     }
-    const apiRes = await fetch(`/api/admin/teachers/${editForm.id}`, {
+    const apiRes = await fetch(`/api/teachers/${editForm.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -149,7 +149,7 @@ export default function TeachersPage() {
   async function onDelete(id: string) {
     if (userRole !== "admin") return;
     if (!confirm('Delete this teacher?')) return;
-    const res = await fetch(`/api/admin/teachers/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/teachers/${id}`, { method: 'DELETE' });
     if (res.ok) loadTeachers();
   }
 

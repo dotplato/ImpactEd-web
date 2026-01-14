@@ -58,7 +58,7 @@ export default function StudentsPage() {
   async function loadStudents() {
     setLoading(true);
     setError(null);
-    const res = await fetch("/api/admin/students");
+    const res = await fetch("/api/students");
     const data = await res.json();
     if (!res.ok) {
       setError(data?.error || 'Failed to fetch');
@@ -104,7 +104,7 @@ export default function StudentsPage() {
       if (upErr) { setError('Upload failed.'); return; }
       avatarUrl = supabase.storage.from('avatars').getPublicUrl(fileName).data.publicUrl;
     }
-    const res = await fetch("/api/admin/students", {
+    const res = await fetch("/api/students", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...form, image_url: avatarUrl }),
@@ -156,7 +156,7 @@ export default function StudentsPage() {
       if (upErr) { setEditError('Upload failed: ' + upErr.message); return; }
       avatarUrl = supabase.storage.from('avatars').getPublicUrl(fileName).data.publicUrl;
     }
-    const res = await fetch(`/api/admin/students/${editForm.id}`, {
+    const res = await fetch(`/api/students/${editForm.id}`, {
       method: 'PATCH', headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...editForm, image_url: avatarUrl }),
     });
@@ -167,7 +167,7 @@ export default function StudentsPage() {
   async function onDelete(id: string) {
     if (userRole !== "admin") return;
     if (!confirm('Delete this student?')) return;
-    const res = await fetch(`/api/admin/students/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/students/${id}`, { method: 'DELETE' });
     if (res.ok) loadStudents();
   }
   // fee status badge color

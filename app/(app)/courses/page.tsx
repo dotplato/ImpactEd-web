@@ -28,7 +28,7 @@ export default function CoursesPage() {
   async function loadCourses() {
     setLoading(true);
     setError(null);
-    const res = await fetch("/api/admin/courses");
+    const res = await fetch("/api/courses");
     const data = await res.json();
     if (!res.ok) {
       setError(data?.error || 'Failed to fetch courses');
@@ -47,7 +47,7 @@ export default function CoursesPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this course?')) return;
-    const res = await fetch(`/api/admin/courses/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/courses/${id}`, { method: 'DELETE' });
     if (res.ok) {
       loadCourses();
     } else {
