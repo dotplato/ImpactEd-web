@@ -47,6 +47,7 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/components/ui/avatar";
+import { SearchInput } from "@/components/ui/search-input";
 
 type Role = "admin" | "teacher" | "student";
 
@@ -89,6 +90,7 @@ export default function SessionsPage({ role }: Props) {
   const [courseIdToStudents, setCourseIdToStudents] = useState<Record<string, Student[]>>({});
   const [studentSearch, setStudentSearch] = useState("");
   const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const canCreate = role === "admin" || role === "teacher";
 
   // Additional state for editing
@@ -442,13 +444,19 @@ export default function SessionsPage({ role }: Props) {
             </TabsTrigger>
           </TabsList>
 
-          {(role === 'admin' || role === 'teacher') && (
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-              <DialogTrigger asChild>
-                <Button variant="secondary" size="sm" className="gap-1">
-                  <Plus className="size-4" /> New Session
-                </Button>
-              </DialogTrigger>
+          <div className="flex items-center gap-2">
+            <SearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search sessions..."
+            />
+            {(role === 'admin' || role === 'teacher') && (
+              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="secondary" size="sm" className="gap-1">
+                    <Plus className="size-4" /> New Session
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>Create Session</DialogTitle>
@@ -664,7 +672,8 @@ export default function SessionsPage({ role }: Props) {
                 </form>
               </DialogContent>
             </Dialog>
-          )}
+            )}
+          </div>
         </div>
 
         <TabsContent value="calendar" className="mt-6">

@@ -50,6 +50,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { supabaseClient } from "@/lib/db/supabase-client";
 import { toast } from "sonner";
+import { SearchInput } from "@/components/ui/search-input";
 
 interface Student {
     id: string;
@@ -104,6 +105,7 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
     const [gradeValue, setGradeValue] = useState("");
     const [submissions, setSubmissions] = useState<Record<string, any>>({});
     const [selectedCourseId, setSelectedCourseId] = useState<string>("all");
+    const [searchQuery, setSearchQuery] = useState("");
 
     const [form, setForm] = useState({
         title: "",
@@ -126,9 +128,19 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
         const u: Assignment[] = [];
         const p: Assignment[] = [];
 
-        const filtered = selectedCourseId === "all"
+        let filtered = selectedCourseId === "all"
             ? assignments
             : assignments.filter(a => a.course?.id === selectedCourseId);
+
+        // Apply search filter
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase().trim();
+            filtered = filtered.filter(a => {
+                const titleMatch = a.title?.toLowerCase().includes(query);
+                const courseMatch = a.course?.title?.toLowerCase().includes(query);
+                return titleMatch || courseMatch;
+            });
+        }
 
         for (const a of filtered) {
             if (!a.due_at) {
@@ -514,6 +526,11 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <SearchInput
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                        placeholder="Search assignments..."
+                    />
                     <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
                         <SelectTrigger className="w-[200px] h-9">
                             <SelectValue placeholder="Filter by Course" />

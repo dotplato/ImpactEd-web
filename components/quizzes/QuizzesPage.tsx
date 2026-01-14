@@ -49,6 +49,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { SearchInput } from "@/components/ui/search-input";
 
 interface Student {
     id: string;
@@ -107,6 +108,7 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
     const [courseIdToStudents, setCourseIdToStudents] = useState<Record<string, Student[]>>({});
     const [studentSearch, setStudentSearch] = useState("");
     const [selectedCourse, setSelectedCourse] = useState<string>("all");
+    const [searchQuery, setSearchQuery] = useState("");
     const [quizOpen, setQuizOpen] = useState(false);
     const [viewOpen, setViewOpen] = useState(false);
     const [submissionsOpen, setSubmissionsOpen] = useState(false);
@@ -140,9 +142,19 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
         const u: Quiz[] = [];
         const p: Quiz[] = [];
 
-        const filtered = selectedCourse === "all"
+        let filtered = selectedCourse === "all"
             ? quizzes
             : quizzes.filter(q => q.course?.id === selectedCourse);
+
+        // Apply search filter
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase().trim();
+            filtered = filtered.filter(q => {
+                const titleMatch = q.title?.toLowerCase().includes(query);
+                const courseMatch = q.course?.title?.toLowerCase().includes(query);
+                return titleMatch || courseMatch;
+            });
+        }
 
         for (const q of filtered) {
             if (!q.due_at) {
@@ -582,6 +594,11 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    <SearchInput
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                        placeholder="Search quizzes..."
+                    />
                     <Select value={selectedCourse} onValueChange={setSelectedCourse}>
                         <SelectTrigger className="w-[200px]">
                             <SelectValue placeholder="Filter by course" />

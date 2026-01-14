@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { CourseCard } from "@/components/course/CourseCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, BookOpen, Loader2, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { SearchInput } from "@/components/ui/search-input";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,7 @@ export default function CoursesPage() {
   const [error, setError] = useState<string | null>(null);
   const [editCourse, setEditCourse] = useState<Course | null>(null);
   const [userRole, setUserRole] = useState<UserRole>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     // Get current user role
@@ -125,24 +127,57 @@ export default function CoursesPage() {
   const canEdit = userRole === "admin";
   const canDelete = userRole === "admin";
 
+  // Filter courses based on search query
+  const filteredCourses = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return courses;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    return courses.filter((course) => {
+      const titleMatch = course.title?.toLowerCase().includes(query);
+      const categoryMatch = course.category?.toLowerCase().includes(query);
+      const levelMatch = course.level?.toLowerCase().includes(query);
+      const teacherNameMatch = course.teacher?.user?.name?.toLowerCase().includes(query);
+      const teacherEmailMatch = course.teacher?.user?.email?.toLowerCase().includes(query);
+      const descriptionMatch = course.description?.toLowerCase().includes(query);
+
+      return (
+        titleMatch ||
+        categoryMatch ||
+        levelMatch ||
+        teacherNameMatch ||
+        teacherEmailMatch ||
+        descriptionMatch
+      );
+    });
+  }, [courses, searchQuery]);
+
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">Courses</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Manage and view all your courses
           </p>
         </div>
-        {canCreate && (
-          <Button asChild>
-            <Link href="/courses/new">
-              <Plus className="size-4 mr-2" />
-              Create Course
-            </Link>
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <SearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search courses..."
+          />
+          {canCreate && (
+            <Button asChild>
+              <Link href="/courses/new">
+                <Plus className="size-4 mr-2" />
+                Create Course
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Error State */}
@@ -161,9 +196,9 @@ export default function CoursesPage() {
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
           <span className="ml-2 text-sm text-muted-foreground">Loading courses...</span>
         </div>
-      ) : courses.length > 0 ? (
+      ) : filteredCourses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map((c) => {
+          {filteredCourses.map((c) => {
             const teacherUser = c.teacher?.user;
             return (
               <CourseCard
@@ -183,6 +218,16 @@ export default function CoursesPage() {
             );
           })}
         </div>
+      ) : searchQuery.trim() ? (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <BookOpen className="size-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-lg font-semibold mb-2">No courses found</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              No courses match your search query "{searchQuery}".
+            </p>
+          </CardContent>
+        </Card>
       ) : (
         <Card>
           <CardContent className="p-12 text-center">
