@@ -176,7 +176,7 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
         p.sort((a, b) => new Date(b.due_at!).getTime() - new Date(a.due_at!).getTime());
 
         return { todayQuizzes: t, upcomingQuizzes: u, pastQuizzes: p };
-    }, [quizzes, selectedCourse]);
+    }, [quizzes, selectedCourse, searchQuery]);
 
     const canCreate = role === "admin" || role === "teacher";
 

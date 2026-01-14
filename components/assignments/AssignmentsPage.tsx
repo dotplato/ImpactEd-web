@@ -162,7 +162,7 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
         p.sort((a, b) => new Date(b.due_at!).getTime() - new Date(a.due_at!).getTime());
 
         return { todayAssignments: t, upcomingAssignments: u, pastAssignments: p };
-    }, [assignments, selectedCourseId]);
+    }, [assignments, selectedCourseId, searchQuery]);
 
     const [submitForm, setSubmitForm] = useState({
         content: "",

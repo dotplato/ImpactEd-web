@@ -104,6 +104,19 @@ export default function SessionsPage({ role }: Props) {
   const now = useMemo(() => new Date(), [sessions.length]);
 
   // Compute session groups for Overview tab
+  // Filter sessions based on search query
+  const filteredSessions = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return sessions;
+    }
+    const query = searchQuery.toLowerCase().trim();
+    return sessions.filter(s => {
+      const titleMatch = s.title?.toLowerCase().includes(query);
+      const courseMatch = s.course?.title?.toLowerCase().includes(query);
+      return titleMatch || courseMatch;
+    });
+  }, [sessions, searchQuery]);
+
   const { todaySessions, upcomingSessions, pastSessions } = useMemo(() => {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -114,7 +127,7 @@ export default function SessionsPage({ role }: Props) {
     const u: SessionRow[] = [];
     const p: SessionRow[] = [];
 
-    for (const s of sessions) {
+    for (const s of filteredSessions) {
       const d = new Date(s.scheduled_at);
       if (d >= startOfToday && d <= endOfToday) {
         t.push(s);
@@ -130,7 +143,7 @@ export default function SessionsPage({ role }: Props) {
     p.sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
 
     return { todaySessions: t, upcomingSessions: u, pastSessions: p };
-  }, [sessions]);
+  }, [filteredSessions]);
 
   function formatTime(iso: string) {
     const d = new Date(iso);
@@ -221,7 +234,7 @@ export default function SessionsPage({ role }: Props) {
   }, []);
 
   // Calendar event mapping
-  const calendarEvents = sessions.map(s => {
+  const calendarEvents = filteredSessions.map(s => {
     const start = new Date(s.scheduled_at);
     const end = new Date(start);
     end.setMinutes(end.getMinutes() + (s.duration_minutes || 60));
