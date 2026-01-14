@@ -9,10 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, X, Upload, ChevronRight, Check, BookOpen, HelpCircle, FileText, Calendar, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, X, Upload, ChevronRight, Check, BookOpen, HelpCircle, FileText, Calendar, ChevronDown, ChevronUp, Trash2, GripVertical, Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Search, Trash2, Edit2, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabaseClient } from "@/lib/db/supabase-client";
 
@@ -124,35 +123,6 @@ export default function NewCoursePage() {
     setWhatStudentsWillLearn(whatStudentsWillLearn.filter((_, i) => i !== index));
   };
 
-  async function uploadFile(file: File) {
-    try {
-      setUploading(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
-      const filePath = `covers/${fileName}`;
-
-      const { error: uploadError } = await supabaseClient.storage
-        .from('course-assets')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabaseClient.storage.from('course-assets').getPublicUrl(filePath);
-      setCoverImage(data.publicUrl);
-    } catch (error: any) {
-      console.error("Upload failed:", error);
-      setError(`Upload failed: ${error.message}`);
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      uploadFile(e.target.files[0]);
-    }
-  };
-
   // Curriculum Handlers
   const addSection = () => {
     setSections([...sections, { id: Date.now().toString(), title: '', lessons: [] }]);
@@ -238,6 +208,35 @@ export default function NewCoursePage() {
       }
       return s;
     }));
+  };
+
+  async function uploadFile(file: File) {
+    try {
+      setUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+      const filePath = `covers/${fileName}`;
+
+      const { error: uploadError } = await supabaseClient.storage
+        .from('course-assets')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabaseClient.storage.from('course-assets').getPublicUrl(filePath);
+      setCoverImage(data.publicUrl);
+    } catch (error: any) {
+      console.error("Upload failed:", error);
+      setError(`Upload failed: ${error.message}`);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      uploadFile(e.target.files[0]);
+    }
   };
 
   const onSubmit = async () => {
@@ -548,7 +547,7 @@ export default function NewCoursePage() {
                     </DialogContent>
                   </Dialog>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 min-h-[32px]">
                   {selectedStudents.slice(0, 5).map(id => {
                     const s = students.find(st => st.id === id);
                     return s ? (
@@ -558,10 +557,20 @@ export default function NewCoursePage() {
                           <AvatarFallback>{s.name.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <span>{s.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudents(prev => prev.filter(sid => sid !== id))}
+                          className="ml-1 hover:text-red-600"
+                        >
+                          <X className="size-3" />
+                        </button>
                       </div>
                     ) : null;
                   })}
                   {selectedStudents.length > 5 && <span className="text-xs text-gray-500 self-center">+{selectedStudents.length - 5} more</span>}
+                  {selectedStudents.length === 0 && (
+                    <span className="text-xs text-muted-foreground italic">No students selected</span>
+                  )}
                 </div>
               </div>
 
@@ -712,7 +721,6 @@ export default function NewCoursePage() {
                                     )}
                                   </div>
                                 )}
-
 
                                 {/* Attachment Required - for quizzes */}
                                 {lesson.type === 'quiz' && (
