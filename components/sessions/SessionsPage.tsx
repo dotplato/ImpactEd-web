@@ -736,7 +736,9 @@ export default function SessionsPage({ role }: Props) {
                       <TableBody>
                         {todaySessions.map((s) => {
                           const startsAt = new Date(s.scheduled_at);
-                          const canJoinNow = now >= startsAt;
+                          const joinWindowEnd = new Date(startsAt);
+                          joinWindowEnd.setHours(joinWindowEnd.getHours() + 3);
+                          const canJoinNow = now >= startsAt && now <= joinWindowEnd;
                           const status = getDisplayedStatus(s);
                           return (
                             <TableRow key={s.id}>

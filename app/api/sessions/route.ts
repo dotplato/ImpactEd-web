@@ -137,12 +137,16 @@ export async function POST(req: Request) {
     }
 
     // 1. Create Daily.co room (required)
-    const roomTitle = title || `Session - ${new Date(scheduledAt).toLocaleString()}`;
+    const startDate = new Date(scheduledAt);
+    const roomTitle = title || `Session - ${startDate.toLocaleString()}`;
+    // Room expires 3 hours after scheduled start
+    const roomExp = Math.floor(startDate.getTime() / 1000) + 60 * 60 * 3;
     const dailyRoom = await createDailyRoom(roomTitle, {
       max_participants: selectedStudents.length + 5, // students + teacher + admin buffer
       enable_chat: true,
       enable_screenshare: true,
       enable_prejoin_ui: true,
+      exp: roomExp,
     });
     const dailyRoomUrl = dailyRoom.url;
     // Daily REST uses /rooms/:name for management

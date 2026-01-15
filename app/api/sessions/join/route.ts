@@ -26,9 +26,17 @@ export async function POST(req: Request) {
       .maybeSingle();
     if (error || !session) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    // Time gate - session must have started
-    if (new Date() < new Date((session as any).scheduled_at)) {
+    // Time gate - session must be within allowed window (start .. start+3h)
+    const start = new Date((session as any).scheduled_at);
+    const now = new Date();
+    const end = new Date(start);
+    end.setHours(end.getHours() + 3);
+
+    if (now < start) {
       return NextResponse.json({ error: "Session not started yet" }, { status: 403 });
+    }
+    if (now > end) {
+      return NextResponse.json({ error: "Session has ended" }, { status: 403 });
     }
 
     // Check if Daily.co room URL exists
@@ -39,20 +47,23 @@ export async function POST(req: Request) {
     }
 
     const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 4; // 4 hours
-    async function issueUrl(isOwner: boolean) {
+
+    const issueUrl = async (isOwner: boolean, userName: string | null): Promise<string> => {
       const token = await createDailyMeetingToken({
         room_name: dailyRoomName,
-        user_name: user.name || user.email || undefined,
+        user_name: userName || undefined,
         is_owner: isOwner,
         exp,
       });
       const sep = dailyRoomUrl.includes("?") ? "&" : "?";
       return `${dailyRoomUrl}${sep}t=${encodeURIComponent(token)}`;
-    }
+    };
 
     // Permission: teacher assigned OR enrolled student OR admin
+    const userName = (user as any)?.name || (user as any)?.email || null;
+
     if (user.role === "admin") {
-      return NextResponse.json({ ok: true, url: await issueUrl(true) });
+      return NextResponse.json({ ok: true, url: await issueUrl(true, userName) });
     }
 
     if (user.role === "teacher") {
@@ -63,7 +74,7 @@ export async function POST(req: Request) {
         .maybeSingle();
       const teacherId = (teacher as any)?.id;
       if (teacherId && teacherId === (session as any).teacher_id) {
-        return NextResponse.json({ ok: true, url: await issueUrl(true) });
+        return NextResponse.json({ ok: true, url: await issueUrl(true, userName) });
       }
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -87,7 +98,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "You are not assigned to this session" }, { status: 403 });
     }
 
-    return NextResponse.json({ ok: true, url: await issueUrl(false) });
+    return NextResponse.json({ ok: true, url: await issueUrl(false, userName) });
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
