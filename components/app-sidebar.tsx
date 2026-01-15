@@ -11,10 +11,8 @@ import {
   IconChalkboardTeacher,
   IconSpeakerphone,
   IconBook,
-  IconPlane,
   IconMessage,
   IconFiles,
-  IconQuestionMark,
   IconAB2,
 } from "@tabler/icons-react"
 
