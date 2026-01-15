@@ -49,8 +49,7 @@ export async function GET(
         let courseQuery = supabase
             .from("courses")
             .select("id, teacher_id")
-            .eq("id", courseId)
-            .maybeSingle();
+            .eq("id", courseId);
 
         if (user.role === "teacher") {
             const { data: teacher } = await supabase
@@ -66,7 +65,7 @@ export async function GET(
             courseQuery = courseQuery.eq("teacher_id", teacher.id);
         }
 
-        const { data: course, error: courseError } = await courseQuery;
+        const { data: course, error: courseError } = await courseQuery.maybeSingle();
 
         if (courseError || !course) {
             return NextResponse.json({ error: "Course not found" }, { status: 404 });
@@ -113,8 +112,7 @@ export async function POST(
         let courseQuery = supabase
             .from("courses")
             .select("id, teacher_id")
-            .eq("id", courseId)
-            .maybeSingle();
+            .eq("id", courseId);
 
         if (user.role === "teacher") {
             const { data: teacher } = await supabase
@@ -130,7 +128,7 @@ export async function POST(
             courseQuery = courseQuery.eq("teacher_id", teacher.id);
         }
 
-        const { data: course, error: courseError } = await courseQuery;
+        const { data: course, error: courseError } = await courseQuery.maybeSingle();
 
         if (courseError || !course) {
             return NextResponse.json({ error: "Course not found" }, { status: 404 });
