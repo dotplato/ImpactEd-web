@@ -183,7 +183,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={data.navMain} role={user?.role || null} />
         {/* <NavDocuments items={data.documents} /> */}
         <NavSecondary items={navSecondaryWithBadge} className="mt-auto" />
       </SidebarContent>

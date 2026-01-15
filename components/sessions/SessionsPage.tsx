@@ -69,9 +69,10 @@ type Student = {
 
 type Props = {
   role: Role;
+  variant?: "full" | "today-only";
 };
 
-export default function SessionsPage({ role }: Props) {
+export default function SessionsPage({ role, variant = "full" }: Props) {
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -449,6 +450,87 @@ export default function SessionsPage({ role }: Props) {
     );
   }
 
+  function renderTodaySection() {
+    return (
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider font-bold">Today</Badge>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+        {todaySessions.length ? (
+          <Card className="px-2">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[120px]">Time</TableHead>
+                  <TableHead>Session</TableHead>
+                  <TableHead className="hidden md:table-cell">Duration</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                  <TableHead className="w-[100px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {todaySessions.map((s) => {
+                  const startsAt = new Date(s.scheduled_at);
+                  const joinWindowEnd = new Date(startsAt);
+                  joinWindowEnd.setHours(joinWindowEnd.getHours() + 3);
+                  const canJoinNow = now >= startsAt && now <= joinWindowEnd;
+                  const status = getDisplayedStatus(s);
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Clock className="size-3.5 text-muted-foreground" />
+                          {formatTime(s.scheduled_at)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-semibold">{s.title || "Session"}</div>
+                        <div className="text-xs text-muted-foreground">{s.course?.title || "-"}</div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-muted-foreground">
+                        {s.duration_minutes} min
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {renderStatusBadge(status)}
+                      </TableCell>
+                      <TableCell>
+                        {renderActions(s, canJoinNow)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg border-dashed">
+            No sessions scheduled for today.
+          </p>
+        )}
+      </section>
+    );
+  }
+
+  if (variant === "today-only") {
+    return (
+      <div className="space-y-6">
+        {error && (
+          <Badge variant="destructive" className="w-full justify-center py-2 text-sm">
+            {formatError(error)}
+          </Badge>
+        )}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="size-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          renderTodaySection()
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -694,13 +776,15 @@ export default function SessionsPage({ role }: Props) {
           </div>
         </div>
 
-        <TabsContent value="calendar" className="mt-6">
-          <CalendarView
-            events={calendarEvents}
-            onDateClick={handleDateClick}
-            onEventClick={handleEventClick}
-          />
-        </TabsContent>
+        {variant === "full" && (
+          <TabsContent value="calendar" className="mt-6">
+            <CalendarView
+              events={calendarEvents}
+              onDateClick={handleDateClick}
+              onEventClick={handleEventClick}
+            />
+          </TabsContent>
+        )}
 
         <TabsContent value="overview" className="mt-6 space-y-8">
           {error && (
@@ -715,170 +799,119 @@ export default function SessionsPage({ role }: Props) {
             </div>
           ) : (
             <>
-              {/* Today */}
-              <section className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider font-bold">Today</Badge>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-                {todaySessions.length ? (
-                  <Card className="px-2">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[120px]">Time</TableHead>
-                          <TableHead>Session</TableHead>
-                          <TableHead className="hidden md:table-cell">Duration</TableHead>
-                          <TableHead className="text-right">Status</TableHead>
-                          <TableHead className="w-[100px]"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {todaySessions.map((s) => {
-                          const startsAt = new Date(s.scheduled_at);
-                          const joinWindowEnd = new Date(startsAt);
-                          joinWindowEnd.setHours(joinWindowEnd.getHours() + 3);
-                          const canJoinNow = now >= startsAt && now <= joinWindowEnd;
-                          const status = getDisplayedStatus(s);
-                          return (
-                            <TableRow key={s.id}>
-                              <TableCell className="font-medium">
-                                <div className="flex items-center gap-2">
-                                  <Clock className="size-3.5 text-muted-foreground" />
-                                  {formatTime(s.scheduled_at)}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="font-semibold">{s.title || 'Session'}</div>
-                                <div className="text-xs text-muted-foreground">{s.course?.title || '-'}</div>
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell text-muted-foreground">
-                                {s.duration_minutes} min
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {renderStatusBadge(status)}
-                              </TableCell>
-                              <TableCell>
-                                {renderActions(s, canJoinNow)}
-                              </TableCell>
+              {renderTodaySection()}
+
+              {variant === "full" && (
+                <>
+                  {/* Upcoming */}
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider font-bold">Upcoming</Badge>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                    {upcomingSessions.length ? (
+                      <Card className="px-2">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[120px]">Time</TableHead>
+                              <TableHead>Session</TableHead>
+                              <TableHead className="hidden md:table-cell">Date</TableHead>
+                              <TableHead className="hidden md:table-cell">Duration</TableHead>
+                              <TableHead className="text-right">Status</TableHead>
+                              <TableHead className="w-[100px]"></TableHead>
                             </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </Card>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg border-dashed">No sessions scheduled for today.</p>
-                )}
-              </section>
+                          </TableHeader>
+                          <TableBody>
+                            {upcomingSessions.map((s) => (
+                              <TableRow key={s.id}>
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="size-3.5 text-muted-foreground" />
+                                    {formatTime(s.scheduled_at)}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="font-semibold">{s.title || 'Session'}</div>
+                                  <div className="text-xs text-muted-foreground">{s.course?.title || '-'}</div>
+                                </TableCell>
+                                <TableCell className="hidden md:table-cell text-muted-foreground">
+                                  {new Date(s.scheduled_at).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell className="hidden md:table-cell text-muted-foreground">
+                                  {s.duration_minutes} min
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {renderStatusBadge(getDisplayedStatus(s))}
+                                </TableCell>
+                                <TableCell>
+                                  {renderActions(s, false)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </Card>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg border-dashed">No upcoming sessions.</p>
+                    )}
+                  </section>
 
-              {/* Upcoming */}
-              <section className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider font-bold">Upcoming</Badge>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-                {upcomingSessions.length ? (
-                  <Card className="px-2">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[120px]">Time</TableHead>
-                          <TableHead>Session</TableHead>
-                          <TableHead className="hidden md:table-cell">Date</TableHead>
-                          <TableHead className="hidden md:table-cell">Duration</TableHead>
-                          <TableHead className="text-right">Status</TableHead>
-                          <TableHead className="w-[100px]"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {upcomingSessions.map((s) => (
-                          <TableRow key={s.id}>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Clock className="size-3.5 text-muted-foreground" />
-                                {formatTime(s.scheduled_at)}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="font-semibold">{s.title || 'Session'}</div>
-                              <div className="text-xs text-muted-foreground">{s.course?.title || '-'}</div>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell text-muted-foreground">
-                              {new Date(s.scheduled_at).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell text-muted-foreground">
-                              {s.duration_minutes} min
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {renderStatusBadge(getDisplayedStatus(s))}
-                            </TableCell>
-                            <TableCell>
-                              {renderActions(s, false)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </Card>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg border-dashed">No upcoming sessions.</p>
-                )}
-              </section>
-
-              {/* Past */}
-              <section className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider font-bold">Past</Badge>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-                {pastSessions.length ? (
-                  <Card className="px-2">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[120px]">Time</TableHead>
-                          <TableHead>Session</TableHead>
-                          <TableHead className="hidden md:table-cell">Date</TableHead>
-                          <TableHead className="hidden md:table-cell">Duration</TableHead>
-                          <TableHead className="text-right">Status</TableHead>
-                          <TableHead className="w-[100px]"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {pastSessions.map((s) => (
-                          <TableRow key={s.id}>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Clock className="size-3.5 text-muted-foreground" />
-                                {formatTime(s.scheduled_at)}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="font-semibold">{s.title || 'Session'}</div>
-                              <div className="text-xs text-muted-foreground">{s.course?.title || '-'}</div>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell text-muted-foreground">
-                              {new Date(s.scheduled_at).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell text-muted-foreground">
-                              {s.duration_minutes} min
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {renderStatusBadge(getDisplayedStatus(s))}
-                            </TableCell>
-                            <TableCell>
-                              {renderActions(s, false)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </Card>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg border-dashed">No past sessions.</p>
-                )}
-              </section>
+                  {/* Past */}
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider font-bold">Past</Badge>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                    {pastSessions.length ? (
+                      <Card className="px-2">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[120px]">Time</TableHead>
+                              <TableHead>Session</TableHead>
+                              <TableHead className="hidden md:table-cell">Date</TableHead>
+                              <TableHead className="hidden md:table-cell">Duration</TableHead>
+                              <TableHead className="text-right">Status</TableHead>
+                              <TableHead className="w-[100px]"></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {pastSessions.map((s) => (
+                              <TableRow key={s.id}>
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="size-3.5 text-muted-foreground" />
+                                    {formatTime(s.scheduled_at)}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="font-semibold">{s.title || 'Session'}</div>
+                                  <div className="text-xs text-muted-foreground">{s.course?.title || '-'}</div>
+                                </TableCell>
+                                <TableCell className="hidden md:table-cell text-muted-foreground">
+                                  {new Date(s.scheduled_at).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell className="hidden md:table-cell text-muted-foreground">
+                                  {s.duration_minutes} min
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {renderStatusBadge(getDisplayedStatus(s))}
+                                </TableCell>
+                                <TableCell>
+                                  {renderActions(s, false)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </Card>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg border-dashed">No past sessions.</p>
+                    )}
+                  </section>
+                </>
+              )}
             </>
           )}
         </TabsContent>

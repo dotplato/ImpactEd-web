@@ -479,14 +479,15 @@ export async function ensureGroupConversation(courseId: string): Promise<string>
 
     const { data, error } = await supabase
         .from("conversations")
-        .upsert({
+        .insert({
             type: "group",
             course_id: courseId
-        }, { onConflict: "course_id" })
+        })
         .select("id")
         .single();
 
     if (error) {
+        // In case of a race where another request created it first, fetch again
         const { data: retry } = await supabase
             .from("conversations")
             .select("id")

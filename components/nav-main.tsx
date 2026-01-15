@@ -1,6 +1,7 @@
-"use client"
+ "use client"
 
-import { IconCirclePlusFilled, IconMail, IconSearch, type Icon } from "@tabler/icons-react"
+import { IconCirclePlusFilled, IconSearch,IconListDetails, type Icon } from "@tabler/icons-react"
+import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -10,29 +11,47 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import Link from "next/link"
+import type { AppUser } from "@/lib/auth/session"
 
-export function NavMain({
-  items,
-}: {
-  items: {
-    title: string
-    url: string
-    icon?: Icon
-  }[]
-}) {
+type NavItem = {
+  title: string
+  url: string
+  icon?: Icon
+}
+
+type NavMainProps = {
+  items: NavItem[]
+  role: AppUser["role"] | null
+}
+
+export function NavMain({ items, role }: NavMainProps) {
+  const isStudent = role === "student"
+
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarMenu>
           <SidebarMenuItem className="flex items-center gap-2">
-            <SidebarMenuButton
-              tooltip="Create"
-              className="bg-secondary text-secondary-foreground hover:bg-secondary/90 hover:text-secondary-foreground active:bg-secondary/90 active:text-secondary-foreground min-w-8 duration-200 ease-linear"
-            >
-              <IconCirclePlusFilled />
-              <span>Create</span>
-            </SidebarMenuButton>
+            {isStudent ? (
+              <SidebarMenuButton
+                asChild
+                tooltip="To do"
+                className="bg-secondary text-secondary-foreground hover:bg-secondary/90 hover:text-secondary-foreground active:bg-secondary/90 active:text-secondary-foreground min-w-8 duration-200 ease-linear"
+              >
+                <Link href="/todos">
+                  <IconListDetails />
+                  <span>To do</span>
+                </Link>
+              </SidebarMenuButton>
+            ) : (
+              <SidebarMenuButton
+                tooltip="Create"
+                className="bg-secondary text-secondary-foreground hover:bg-secondary/90 hover:text-secondary-foreground active:bg-secondary/90 active:text-secondary-foreground min-w-8 duration-200 ease-linear"
+              >
+                <IconCirclePlusFilled />
+                <span>Create</span>
+              </SidebarMenuButton>
+            )}
             <Button
               size="icon"
               className="size-8 group-data-[collapsible=icon]:opacity-0"

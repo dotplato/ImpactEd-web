@@ -1025,6 +1025,13 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
                         <TableBody>
                             {quizzes
                                 .filter(q => selectedCourse === "all" || q.course.id === selectedCourse)
+                                .filter(q => {
+                                    if (!searchQuery.trim()) return true;
+                                    const query = searchQuery.toLowerCase().trim();
+                                    const titleMatch = q.title?.toLowerCase().includes(query);
+                                    const courseMatch = q.course?.title?.toLowerCase().includes(query);
+                                    return titleMatch || courseMatch;
+                                })
                                 .length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
@@ -1034,6 +1041,13 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
                             ) : (
                                 quizzes
                                     .filter(q => selectedCourse === "all" || q.course.id === selectedCourse)
+                                    .filter(q => {
+                                        if (!searchQuery.trim()) return true;
+                                        const query = searchQuery.toLowerCase().trim();
+                                        const titleMatch = q.title?.toLowerCase().includes(query);
+                                        const courseMatch = q.course?.title?.toLowerCase().includes(query);
+                                        return titleMatch || courseMatch;
+                                    })
                                     .map((q) => {
                                         const submission = (q as any).submissions?.[0] || submissions[q.id];
                                         const isSubmitted = !!submission;
