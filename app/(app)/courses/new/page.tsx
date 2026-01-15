@@ -276,24 +276,27 @@ export default function NewCoursePage() {
     <div className="max-w-5xl mx-auto py-8 px-4">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold">Create New Course</h1>
-        <Button variant="outline" size="sm">Preview</Button>
+        <Button variant="ghost" size="icon" asChild>
+          <a href="/courses" title="Back to Courses">
+            <X className="size-5" />
+          </a>
+        </Button>
       </div>
 
       {/* Steps Indicator */}
       <div className="flex items-center gap-4 mb-8 text-sm">
-        <div className={`flex items-center gap-2 ${step === 1 ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
-          <div className={`size-6 rounded-full flex items-center justify-center border ${step === 1 ? 'border-blue-600 bg-blue-50' : 'border-gray-300'}`}>1</div>
+        <div className={`flex items-center gap-2 ${step === 1 ? 'text-primary font-medium' : 'text-gray-500'}`}>
+          <div className={`size-6 rounded-full flex items-center justify-center border ${step === 1 ? 'border-primary bg-blue-50' : 'border-gray-300'}`}>1</div>
           Course Landing
         </div>
         <ChevronRight className="size-4 text-gray-300" />
-        <div className={`flex items-center gap-2 ${step === 2 ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
-          <div className={`size-6 rounded-full flex items-center justify-center border ${step === 2 ? 'border-blue-600 bg-blue-50' : 'border-gray-300'}`}>2</div>
-          Curriculum
+        <div className={`flex items-center gap-2 ${step === 2 ? 'text-primary font-medium' : 'text-gray-500'}`}>
+          <div className={`size-6 rounded-full flex items-center justify-center border ${step === 2 ? 'border-primary bg-blue-50' : 'border-gray-300'}`}>2</div>
+          Schedule
         </div>
-        <ChevronRight className="size-4 text-gray-300" />
-        <div className={`flex items-center gap-2 ${step === 3 ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
-          <div className={`size-6 rounded-full flex items-center justify-center border ${step === 3 ? 'border-blue-600 bg-blue-50' : 'border-gray-300'}`}>3</div>
-          FAQ
+        <ChevronRight className="size-4 text-gray-300" /> <div className={`flex items-center gap-2 ${step === 3 ? 'text-primary font-medium' : 'text-gray-500'}`}>
+          <div className={`size-6 rounded-full flex items-center justify-center border ${step === 3 ? 'border-primary bg-blue-50' : 'border-gray-300'}`}>3</div>
+          FAQs
         </div>
       </div>
 
@@ -433,7 +436,7 @@ export default function NewCoursePage() {
                       )}
                     </div>
                   ))}
-                  <Button variant="outline" size="sm" onClick={handleAddLearnPoint} className="text-blue-600 border-blue-200 hover:bg-blue-50">
+                  <Button variant="outline" size="sm" onClick={handleAddLearnPoint} >
                     <Plus className="size-4 mr-2" /> Add New
                   </Button>
                 </div>
@@ -459,7 +462,7 @@ export default function NewCoursePage() {
                         {uploading ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div> : <Upload className="size-6 text-gray-400" />}
                       </div>
                       <p className="text-sm font-medium">
-                        {uploading ? "Uploading..." : <>Drag and drop an image, or <span className="text-blue-600">Browse</span></>}
+                        {uploading ? "Uploading..." : <>Drag and drop an image, or <span className="text-primary">Browse</span></>}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Maximum 1400px * 1400px</p>
                     </>
@@ -503,8 +506,13 @@ export default function NewCoursePage() {
                   <Label className="text-xs text-gray-500 uppercase tracking-wider block">Enroll Students</Label>
                   <Dialog open={selectionDialogOpen} onOpenChange={setSelectionDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
-                        <Plus className="size-3" /> Select Students
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="size-8 rounded-full border-primary text-primary hover:bg-primary/10"
+                      >
+                        <Plus className="size-4" />
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden gap-0">
@@ -605,7 +613,7 @@ export default function NewCoursePage() {
           </Card>
 
           <div className="flex justify-end">
-            <Button onClick={() => setStep(2)} className="bg-black text-white hover:bg-gray-800 px-8">
+            <Button onClick={() => setStep(2)} >
               Next Step <ChevronRight className="ml-2 size-4" />
             </Button>
           </div>
@@ -770,7 +778,7 @@ export default function NewCoursePage() {
                     })}
 
                     <div className="flex gap-2 mt-4">
-                      <Button variant="outline" size="sm" className="text-xs gap-2" onClick={() => addLesson(section.id, 'lecture')}>
+                      <Button  size="sm" className="text-xs gap-2" onClick={() => addLesson(section.id, 'lecture')}>
                         <BookOpen className="size-3" /> Add Lecture
                       </Button>
                       <Button variant="outline" size="sm" className="text-xs gap-2" onClick={() => addLesson(section.id, 'quiz')}>
@@ -792,7 +800,7 @@ export default function NewCoursePage() {
 
           <div className="flex justify-between">
             <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-            <Button onClick={() => setStep(3)} className="bg-black text-white hover:bg-gray-800 px-8">
+            <Button onClick={() => setStep(3)}>
               Next Step <ChevronRight className="ml-2 size-4" />
             </Button>
           </div>
@@ -811,7 +819,7 @@ export default function NewCoursePage() {
 
           <div className="flex justify-between">
             <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
-            <Button onClick={onSubmit} disabled={loading} className="bg-black text-white hover:bg-gray-800 px-8">
+            <Button onClick={onSubmit} disabled={loading}>
               {loading ? "Creating..." : "Create Course"}
             </Button>
           </div>

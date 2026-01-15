@@ -27,7 +27,8 @@ import {
   AlertCircle,
   Plus,
   Search,
-  GripVertical
+  GripVertical,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -581,8 +582,8 @@ export default function CourseDetailPage() {
         {canCreateSession && (
           <Dialog open={createSessionOpen} onOpenChange={setCreateSessionOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Plus className="size-4 mr-2" /> Add Session
+              <Button variant="secondary" size="sm">
+                <Plus className="size-4 mr-2" /> Add Course Session
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
@@ -803,9 +804,20 @@ export default function CourseDetailPage() {
         <div className="lg:col-span-3 space-y-6">
           <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as "overview" | "schedule" | "files")} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="schedule">Schedule</TabsTrigger>
-              {canUploadFiles && <TabsTrigger value="files">Files</TabsTrigger>}
+              <TabsTrigger value="overview" className="gap-2">
+                <BookOpen className="size-4" />
+                <span>Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="schedule" className="gap-2">
+                <CalendarDays className="size-4" />
+                <span>Schedule</span>
+              </TabsTrigger>
+              {canUploadFiles && (
+                <TabsTrigger value="files" className="gap-2">
+                  <FileText className="size-4" />
+                  <span>Files</span>
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {/* Overview Tab */}

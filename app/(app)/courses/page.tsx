@@ -170,7 +170,7 @@ export default function CoursesPage() {
             placeholder="Search courses..."
           />
           {canCreate && (
-            <Button asChild>
+            <Button variant="secondary" asChild>
               <Link href="/courses/new">
                 <Plus className="size-4 mr-2" />
                 Create Course
