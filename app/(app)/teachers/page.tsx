@@ -83,7 +83,7 @@ export default function TeachersPage() {
           setUserRole(data.user.role);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   async function loadTeachers() {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
     LayoutGrid,
     Plus,
@@ -170,6 +171,15 @@ export default function AssignmentsPage({ role }: AssignmentsPageProps) {
     });
 
     const canCreate = role === "admin" || role === "teacher";
+
+    const searchParams = useSearchParams();
+    const shouldCreate = searchParams.get("create") === "true";
+
+    useEffect(() => {
+        if (shouldCreate) {
+            setCreateOpen(true);
+        }
+    }, [shouldCreate]);
 
     useEffect(() => {
         loadAssignments();

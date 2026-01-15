@@ -47,13 +47,13 @@ export default function NewCoursePage() {
   const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
 
   // Curriculum State
-  const [sections, setSections] = useState<{ 
-    id: string; 
-    title: string; 
-    lessons: { 
-      id: string; 
-      title: string; 
-      type: 'lecture' | 'quiz' | 'assignment'; 
+  const [sections, setSections] = useState<{
+    id: string;
+    title: string;
+    lessons: {
+      id: string;
+      title: string;
+      type: 'lecture' | 'quiz' | 'assignment';
       scheduledAt?: string;
       // Assignment fields
       description?: string;
@@ -64,7 +64,7 @@ export default function NewCoursePage() {
       questions?: any[];
       // Lecture fields
       duration?: number;
-    }[] 
+    }[]
   }[]>([
     { id: '1', title: '', lessons: [{ id: '1-1', title: '', type: 'lecture', scheduledAt: '', duration: 60 }] }
   ]);
@@ -142,13 +142,13 @@ export default function NewCoursePage() {
     const newLessonId = Date.now().toString();
     setSections(sections.map(s => {
       if (s.id === sectionId) {
-        const baseLesson = { 
-          id: newLessonId, 
-          title: '', 
-          type, 
-          scheduledAt: '' 
+        const baseLesson = {
+          id: newLessonId,
+          title: '',
+          type,
+          scheduledAt: ''
         };
-        
+
         if (type === 'lecture') {
           return { ...s, lessons: [...s.lessons, { ...baseLesson, duration: 60 }] };
         } else if (type === 'assignment') {
@@ -642,7 +642,7 @@ export default function NewCoursePage() {
                   <div className="pl-10 space-y-3">
                     {section.lessons.map((lesson, lIdx) => {
                       const isExpanded = expandedLessons.has(lesson.id);
-                      
+
                       return (
                         <div key={lesson.id} className="group relative">
                           <div className="absolute left-[-24px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-blue-500"></div>
@@ -658,10 +658,10 @@ export default function NewCoursePage() {
                                 value={lesson.title}
                                 onChange={e => updateLessonTitle(section.id, lesson.id, e.target.value)}
                               />
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="opacity-0 group-hover:opacity-100" 
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="opacity-0 group-hover:opacity-100"
                                 onClick={() => toggleLessonExpanded(lesson.id)}
                                 title={isExpanded ? "Collapse details" : "Expand details"}
                               >
@@ -778,7 +778,7 @@ export default function NewCoursePage() {
                     })}
 
                     <div className="flex gap-2 mt-4">
-                      <Button  size="sm" className="text-xs gap-2" onClick={() => addLesson(section.id, 'lecture')}>
+                      <Button size="sm" className="text-xs gap-2" onClick={() => addLesson(section.id, 'lecture')}>
                         <BookOpen className="size-3" /> Add Lecture
                       </Button>
                       <Button variant="outline" size="sm" className="text-xs gap-2" onClick={() => addLesson(section.id, 'quiz')}>

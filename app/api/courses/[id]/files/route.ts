@@ -32,7 +32,7 @@ export async function GET(
                 .select("id")
                 .eq("user_id", user.id)
                 .maybeSingle();
-            
+
             if (!teacher) {
                 return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
             }
@@ -96,7 +96,7 @@ export async function POST(
                 .select("id")
                 .eq("user_id", user.id)
                 .maybeSingle();
-            
+
             if (!teacher) {
                 return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
             }

@@ -67,7 +67,7 @@ export default function CoursesPage() {
         setError(data?.error || 'Failed to fetch courses');
         return;
       }
-      
+
       // Transform courses to handle teacher data structure and student count
       const transformedCourses = (data.courses || []).map((c: any) => {
         // Handle teacher data - it can be an object with user nested inside
@@ -75,7 +75,7 @@ export default function CoursesPage() {
         if (c.teacher?.user) {
           teacherUser = c.teacher.user;
         }
-        
+
         // Get student count from course_students relationship
         let studentCount = 0;
         if (Array.isArray(c.students)) {
@@ -83,7 +83,7 @@ export default function CoursesPage() {
         } else if (c.students && typeof c.students === 'object' && c.students.length !== undefined) {
           studentCount = c.students.length;
         }
-        
+
         return {
           ...c,
           teacher: c.teacher ? {
@@ -93,7 +93,7 @@ export default function CoursesPage() {
           studentCount,
         };
       });
-      
+
       setCourses(transformedCourses);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch courses');
@@ -234,7 +234,7 @@ export default function CoursesPage() {
             <BookOpen className="size-12 mx-auto mb-4 text-muted-foreground opacity-50" />
             <h3 className="text-lg font-semibold mb-2">No courses yet</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              {canCreate 
+              {canCreate
                 ? "Get started by creating your first course."
                 : "No courses have been created yet."}
             </p>

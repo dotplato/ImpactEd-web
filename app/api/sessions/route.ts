@@ -163,7 +163,7 @@ export async function POST(req: Request) {
       daily_room_url: dailyRoomUrl,
       daily_room_id: dailyRoomName,
     }).select('id').single();
-    
+
     if (insErr) {
       // If session insert fails, try to clean up Daily.co room
       try {
@@ -173,9 +173,9 @@ export async function POST(req: Request) {
       }
       throw new Error(insErr.message);
     }
-    
+
     const sessionId = created.id;
-    
+
     // 3. Insert session_students
     if (selectedStudents.length) {
       const rels = selectedStudents.map(studentId => ({ session_id: sessionId, student_id: studentId }));
@@ -191,7 +191,7 @@ export async function POST(req: Request) {
         throw new Error(relErr.message);
       }
     }
-    
+
     return NextResponse.json({ ok: true, dailyRoomUrl });
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
@@ -254,10 +254,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { sessionId
     .select("daily_room_id")
     .eq("id", sessionId)
     .maybeSingle();
-  
+
   const { error: delErr } = await supabase.from("course_sessions").delete().eq("id", sessionId);
   if (delErr) return NextResponse.json({ error: delErr.message }, { status: 400 });
-  
+
   // Clean up Daily.co room if it exists
   if (sessionToDelete?.daily_room_id) {
     try {
@@ -267,7 +267,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { sessionId
       console.error("Failed to cleanup Daily.co room:", cleanupError);
     }
   }
-  
+
   return NextResponse.json({ ok: true });
 }
 

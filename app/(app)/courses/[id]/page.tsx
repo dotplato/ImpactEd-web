@@ -10,16 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  FileText, 
-  BookOpen, 
-  HelpCircle, 
-  Users, 
-  User, 
-  Upload, 
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  FileText,
+  BookOpen,
+  HelpCircle,
+  Users,
+  User,
+  Upload,
   Trash2,
   Download,
   CheckCircle2,
@@ -45,18 +45,18 @@ type CourseDetails = {
   cover_image?: string | null;
   tenure_start?: string | null;
   tenure_end?: string | null;
-  teacher?: { 
-    id: string; 
-    user?: { 
-      id: string; 
-      name: string | null; 
+  teacher?: {
+    id: string;
+    user?: {
+      id: string;
+      name: string | null;
       email: string | null;
       image_url?: string | null;
     } | null;
   } | null;
-  students: { 
-    id: string; 
-    name: string; 
+  students: {
+    id: string;
+    name: string;
     email: string;
     image_url?: string | null;
   }[];
@@ -164,7 +164,7 @@ export default function CourseDetailPage() {
           setUserRole(data.user.role);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   async function loadCourse() {
@@ -177,7 +177,7 @@ export default function CourseDetailPage() {
         setError(data?.error || "Failed to load course");
         return;
       }
-      
+
       // Transform students to include image_url
       const transformedCourse = {
         ...data.course,
@@ -188,7 +188,7 @@ export default function CourseDetailPage() {
           image_url: s.image_url || null,
         })),
       };
-      
+
       setCourse(transformedCourse);
     } catch (err: any) {
       setError(err.message || "Failed to load course");
@@ -348,7 +348,7 @@ export default function CourseDetailPage() {
     }
 
     const sorted = items.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
-    
+
     // Debug logging
     console.log('Curriculum Items:', {
       total: sorted.length,
@@ -357,7 +357,7 @@ export default function CourseDetailPage() {
       quizzes: quizzes?.length || 0,
       items: sorted.map(i => ({ type: i.type, title: i.title, scheduledAt: i.scheduledAt }))
     });
-    
+
     return sorted;
   }, [sessions, assignments, quizzes]);
 
@@ -369,7 +369,7 @@ export default function CourseDetailPage() {
       startDate: startStr,
       curriculumItemsCount: curriculumItems?.length || 0
     });
-    
+
     if (!startStr || !curriculumItems || curriculumItems.length === 0) {
       console.log('Week grouping skipped - no start date or no items');
       return [] as Array<{
@@ -389,11 +389,11 @@ export default function CourseDetailPage() {
         }>;
       }>;
     }
-    
+
     const startDate = new Date(startStr);
     startDate.setHours(0, 0, 0, 0);
     console.log('Start date for week calculation:', startDate.toISOString());
-    
+
     const groups: Record<number, {
       start: Date;
       end: Date;
@@ -405,16 +405,16 @@ export default function CourseDetailPage() {
         console.log('Skipping item without scheduledAt:', item.title);
         continue; // Skip items without scheduled date
       }
-      
+
       const itemDate = new Date(item.scheduledAt);
       if (isNaN(itemDate.getTime())) {
         console.log('Skipping item with invalid date:', item.title, item.scheduledAt);
         continue; // Skip invalid dates
       }
-      
+
       const diffMs = itemDate.getTime() - startDate.getTime();
       const weekIndex = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
-      
+
       console.log('Item week calculation:', {
         title: item.title,
         scheduledAt: item.scheduledAt,
@@ -422,20 +422,20 @@ export default function CourseDetailPage() {
         diffMs,
         weekIndex
       });
-      
+
       if (!groups[weekIndex]) {
         const weekStart = new Date(startDate.getTime() + weekIndex * 7 * 24 * 60 * 60 * 1000);
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
-        
+
         groups[weekIndex] = {
           start: weekStart,
           end: weekEnd,
           items: [],
         };
       }
-      
+
       groups[weekIndex].items.push(item);
     }
 
@@ -455,13 +455,13 @@ export default function CourseDetailPage() {
           }),
         };
       });
-    
+
     console.log('Week Groups Result:', {
       totalWeeks: ordered.length,
       totalItems: ordered.reduce((sum, w) => sum + w.items.length, 0),
       weeks: ordered.map(w => ({ label: w.label, items: w.items.length, itemTitles: w.items.map(i => i.title) }))
     });
-    
+
     return ordered;
   }, [curriculumItems, course?.tenure_start]);
 
@@ -790,8 +790,8 @@ export default function CourseDetailPage() {
       {/* Cover Image */}
       {course.cover_image && (
         <div className="relative w-full h-64 rounded-lg overflow-hidden border">
-          <img 
-            src={course.cover_image} 
+          <img
+            src={course.cover_image}
             alt={course.title}
             className="w-full h-full object-cover"
           />
@@ -947,8 +947,8 @@ export default function CourseDetailPage() {
                                         item.type === 'lecture'
                                           ? `/sessions`
                                           : item.type === 'assignment'
-                                          ? `/assignments`
-                                          : `/quizzes`
+                                            ? `/assignments`
+                                            : `/quizzes`
                                       }
                                     >
                                       View
@@ -1064,8 +1064,8 @@ export default function CourseDetailPage() {
                                       item.type === 'lecture'
                                         ? `/sessions`
                                         : item.type === 'assignment'
-                                        ? `/assignments`
-                                        : `/quizzes`
+                                          ? `/assignments`
+                                          : `/quizzes`
                                     }
                                   >
                                     View

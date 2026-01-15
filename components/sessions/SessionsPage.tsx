@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { LayoutGrid, CalendarDays, Plus, Pencil, Trash, LogIn, Clock, Loader2, Search, Check } from 'lucide-react';
 import { CalendarView } from "@/components/ui/calendar-view";
 import { cn } from "@/lib/utils";
@@ -227,6 +228,15 @@ export default function SessionsPage({ role, variant = "full" }: Props) {
       // ignore
     }
   }
+
+  const searchParams = useSearchParams();
+  const shouldCreate = searchParams.get("create") === "true";
+
+  useEffect(() => {
+    if (shouldCreate) {
+      setCreateOpen(true);
+    }
+  }, [shouldCreate]);
 
   useEffect(() => {
     loadSessions();
@@ -557,221 +567,221 @@ export default function SessionsPage({ role, variant = "full" }: Props) {
                     <Plus className="size-4" /> New Session
                   </Button>
                 </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Create Session</DialogTitle>
-                  <DialogDescription>
-                    Schedule a new learning session for your students.
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={onCreate} className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="course">Course</Label>
-                    <Select
-                      value={form.courseId}
-                      onValueChange={async (val: string) => {
-                        setForm(f => ({ ...f, courseId: val, selectedStudents: [] }));
-                        const pre = courseIdToStudents[val] || [];
-                        setEnrolledStudents(pre);
-                        if (!courseIdToStudents[val]) {
-                          await loadStudentsForCourse(val);
-                        }
-                      }}
-                    >
-                      <SelectTrigger id="course">
-                        <SelectValue placeholder="Select course" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {courses.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {form.courseId && (
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Create Session</DialogTitle>
+                    <DialogDescription>
+                      Schedule a new learning session for your students.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={onCreate} className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                      <div className="flex items-center justify-between">
-                        <Label>Students</Label>
-                        <div className="flex items-center gap-2">
-                          <div className="flex -space-x-2 overflow-hidden">
-                            {form.selectedStudents.slice(0, 5).map(id => {
-                              const student = enrolledStudents.find(s => s.id === id);
-                              if (!student) return null;
-                              return (
-                                <Avatar key={id} className="size-7 border-2 border-background">
-                                  <AvatarImage src={student.image_url || undefined} />
-                                  <AvatarFallback className="text-[10px]">{student.name.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                              );
-                            })}
-                            {form.selectedStudents.length > 5 && (
-                              <div className="flex size-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-medium">
-                                +{form.selectedStudents.length - 5}
-                              </div>
-                            )}
-                          </div>
-                          <Dialog open={selectionDialogOpen} onOpenChange={setSelectionDialogOpen}>
-                            <DialogTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                className="size-8 rounded-full border-primary text-primary hover:bg-primary/10"
-                              >
-                                <Plus className="size-4" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden gap-0">
-                              <DialogHeader className="p-6 pb-2">
-                                <DialogTitle>Select Students</DialogTitle>
-                                <DialogDescription>
-                                  Invite students to this session. This will create a group session.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="p-4 pt-2 border-b">
-                                <div className="relative">
-                                  <Search className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
-                                  <Input
-                                    placeholder="Search students..."
-                                    className="pl-8 h-9 bg-background"
-                                    value={studentSearch}
-                                    onChange={(e) => setStudentSearch(e.target.value)}
-                                  />
+                      <Label htmlFor="course">Course</Label>
+                      <Select
+                        value={form.courseId}
+                        onValueChange={async (val: string) => {
+                          setForm(f => ({ ...f, courseId: val, selectedStudents: [] }));
+                          const pre = courseIdToStudents[val] || [];
+                          setEnrolledStudents(pre);
+                          if (!courseIdToStudents[val]) {
+                            await loadStudentsForCourse(val);
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="course">
+                          <SelectValue placeholder="Select course" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {courses.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {form.courseId && (
+                      <div className="grid gap-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Students</Label>
+                          <div className="flex items-center gap-2">
+                            <div className="flex -space-x-2 overflow-hidden">
+                              {form.selectedStudents.slice(0, 5).map(id => {
+                                const student = enrolledStudents.find(s => s.id === id);
+                                if (!student) return null;
+                                return (
+                                  <Avatar key={id} className="size-7 border-2 border-background">
+                                    <AvatarImage src={student.image_url || undefined} />
+                                    <AvatarFallback className="text-[10px]">{student.name.charAt(0)}</AvatarFallback>
+                                  </Avatar>
+                                );
+                              })}
+                              {form.selectedStudents.length > 5 && (
+                                <div className="flex size-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-medium">
+                                  +{form.selectedStudents.length - 5}
                                 </div>
-                              </div>
-                              <div className="h-80 overflow-y-auto">
-                                <div className="divide-y">
-                                  <div
-                                    className="flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer transition-colors"
-                                    onClick={() => {
-                                      const allSelected = form.selectedStudents.length === enrolledStudents.length;
-                                      setForm((f: typeof form) => ({
-                                        ...f,
-                                        selectedStudents: allSelected ? [] : enrolledStudents.map(s => s.id),
-                                      }));
-                                    }}
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                        <Check className={cn("size-4 text-primary transition-opacity", form.selectedStudents.length === enrolledStudents.length ? "opacity-100" : "opacity-0")} />
-                                      </div>
-                                      <span className="font-medium">Select All</span>
-                                    </div>
-                                    <Checkbox
-                                      checked={form.selectedStudents.length === enrolledStudents.length}
-                                      className="pointer-events-none"
-                                    />
-                                  </div>
-                                  {enrolledStudents
-                                    .filter(s =>
-                                      s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
-                                      s.email.toLowerCase().includes(studentSearch.toLowerCase())
-                                    )
-                                    .map(s => {
-                                      const isSelected = form.selectedStudents.includes(s.id);
-                                      return (
-                                        <div
-                                          key={s.id}
-                                          className={cn(
-                                            "flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer transition-colors",
-                                            isSelected && "bg-primary/5"
-                                          )}
-                                          onClick={() => {
-                                            setForm((f: typeof form) => ({
-                                              ...f,
-                                              selectedStudents: isSelected
-                                                ? f.selectedStudents.filter(id => id !== s.id)
-                                                : [...f.selectedStudents, s.id],
-                                            }));
-                                          }}
-                                        >
-                                          <div className="flex items-center gap-3">
-                                            <Avatar className="size-8">
-                                              <AvatarImage src={s.image_url || undefined} />
-                                              <AvatarFallback>{s.name.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            <div className="flex flex-col">
-                                              <span className="text-sm font-medium">{s.name}</span>
-                                              <span className="text-xs text-muted-foreground">{s.email}</span>
-                                            </div>
-                                          </div>
-                                          <div className="flex items-center gap-2">
-                                            {isSelected && <Check className="size-4 text-primary" />}
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                </div>
-                              </div>
-                              <div className="p-4 border-t bg-muted/10 flex items-center justify-between gap-4">
-                                <div className="flex -space-x-2 overflow-hidden no-scrollbar">
-                                  {form.selectedStudents.map(id => {
-                                    const student = enrolledStudents.find(s => s.id === id);
-                                    if (!student) return null;
-                                    return (
-                                      <Avatar key={id} className="size-8 border-2 border-background">
-                                        <AvatarImage src={student.image_url || undefined} />
-                                        <AvatarFallback className="text-xs">{student.name.charAt(0)}</AvatarFallback>
-                                      </Avatar>
-                                    );
-                                  })}
-                                </div>
+                              )}
+                            </div>
+                            <Dialog open={selectionDialogOpen} onOpenChange={setSelectionDialogOpen}>
+                              <DialogTrigger asChild>
                                 <Button
                                   type="button"
-                                  className="bg-purple-700 hover:bg-purple-800 text-white px-8"
-                                  onClick={() => setSelectionDialogOpen(false)}
+                                  variant="outline"
+                                  size="icon"
+                                  className="size-8 rounded-full border-primary text-primary hover:bg-primary/10"
                                 >
-                                  Continue
+                                  <Plus className="size-4" />
                                 </Button>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
+                              </DialogTrigger>
+                              <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden gap-0">
+                                <DialogHeader className="p-6 pb-2">
+                                  <DialogTitle>Select Students</DialogTitle>
+                                  <DialogDescription>
+                                    Invite students to this session. This will create a group session.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="p-4 pt-2 border-b">
+                                  <div className="relative">
+                                    <Search className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
+                                    <Input
+                                      placeholder="Search students..."
+                                      className="pl-8 h-9 bg-background"
+                                      value={studentSearch}
+                                      onChange={(e) => setStudentSearch(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="h-80 overflow-y-auto">
+                                  <div className="divide-y">
+                                    <div
+                                      className="flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                                      onClick={() => {
+                                        const allSelected = form.selectedStudents.length === enrolledStudents.length;
+                                        setForm((f: typeof form) => ({
+                                          ...f,
+                                          selectedStudents: allSelected ? [] : enrolledStudents.map(s => s.id),
+                                        }));
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                          <Check className={cn("size-4 text-primary transition-opacity", form.selectedStudents.length === enrolledStudents.length ? "opacity-100" : "opacity-0")} />
+                                        </div>
+                                        <span className="font-medium">Select All</span>
+                                      </div>
+                                      <Checkbox
+                                        checked={form.selectedStudents.length === enrolledStudents.length}
+                                        className="pointer-events-none"
+                                      />
+                                    </div>
+                                    {enrolledStudents
+                                      .filter(s =>
+                                        s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                                        s.email.toLowerCase().includes(studentSearch.toLowerCase())
+                                      )
+                                      .map(s => {
+                                        const isSelected = form.selectedStudents.includes(s.id);
+                                        return (
+                                          <div
+                                            key={s.id}
+                                            className={cn(
+                                              "flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer transition-colors",
+                                              isSelected && "bg-primary/5"
+                                            )}
+                                            onClick={() => {
+                                              setForm((f: typeof form) => ({
+                                                ...f,
+                                                selectedStudents: isSelected
+                                                  ? f.selectedStudents.filter(id => id !== s.id)
+                                                  : [...f.selectedStudents, s.id],
+                                              }));
+                                            }}
+                                          >
+                                            <div className="flex items-center gap-3">
+                                              <Avatar className="size-8">
+                                                <AvatarImage src={s.image_url || undefined} />
+                                                <AvatarFallback>{s.name.charAt(0)}</AvatarFallback>
+                                              </Avatar>
+                                              <div className="flex flex-col">
+                                                <span className="text-sm font-medium">{s.name}</span>
+                                                <span className="text-xs text-muted-foreground">{s.email}</span>
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              {isSelected && <Check className="size-4 text-primary" />}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                  </div>
+                                </div>
+                                <div className="p-4 border-t bg-muted/10 flex items-center justify-between gap-4">
+                                  <div className="flex -space-x-2 overflow-hidden no-scrollbar">
+                                    {form.selectedStudents.map(id => {
+                                      const student = enrolledStudents.find(s => s.id === id);
+                                      if (!student) return null;
+                                      return (
+                                        <Avatar key={id} className="size-8 border-2 border-background">
+                                          <AvatarImage src={student.image_url || undefined} />
+                                          <AvatarFallback className="text-xs">{student.name.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                      );
+                                    })}
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    className="bg-purple-700 hover:bg-purple-800 text-white px-8"
+                                    onClick={() => setSelectionDialogOpen(false)}
+                                  >
+                                    Continue
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="title">Title (Optional)</Label>
-                    <Input
-                      id="title"
-                      value={form.title}
-                      onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                      placeholder="Session title"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="start">Start Time</Label>
+                      <Label htmlFor="title">Title (Optional)</Label>
                       <Input
-                        id="start"
-                        type="datetime-local"
-                        required
-                        value={form.scheduledAt}
-                        onChange={(e) => setForm((f) => ({ ...f, scheduledAt: e.target.value }))}
+                        id="title"
+                        value={form.title}
+                        onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                        placeholder="Session title"
                       />
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="duration">Duration (min)</Label>
-                      <Input
-                        id="duration"
-                        type="number"
-                        min={1}
-                        value={form.duration}
-                        onChange={(e) => setForm((f) => ({ ...f, duration: Number(e.target.value) }))}
-                      />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="start">Start Time</Label>
+                        <Input
+                          id="start"
+                          type="datetime-local"
+                          required
+                          value={form.scheduledAt}
+                          onChange={(e) => setForm((f) => ({ ...f, scheduledAt: e.target.value }))}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="duration">Duration (min)</Label>
+                        <Input
+                          id="duration"
+                          type="number"
+                          min={1}
+                          value={form.duration}
+                          onChange={(e) => setForm((f) => ({ ...f, duration: Number(e.target.value) }))}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" disabled={form.selectedStudents.length === 0}>
-                      Create Session
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+                    <DialogFooter>
+                      <Button type="submit" disabled={form.selectedStudents.length === 0}>
+                        Create Session
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
         </div>

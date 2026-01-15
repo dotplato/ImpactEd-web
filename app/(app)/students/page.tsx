@@ -100,7 +100,7 @@ export default function StudentsPage() {
           setUserRole(data.user.role);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   async function loadStudents() {

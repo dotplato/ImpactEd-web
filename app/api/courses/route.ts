@@ -24,7 +24,7 @@ export async function GET() {
     }
 
     const supabase = getSupabaseServerClient();
-    
+
     // Teachers can only see their own courses
     if (user.role === "teacher") {
         const { data: teacher } = await supabase
@@ -32,7 +32,7 @@ export async function GET() {
             .select("id")
             .eq("user_id", user.id)
             .maybeSingle();
-        
+
         if (!teacher) {
             return NextResponse.json({ courses: [] });
         }
@@ -126,7 +126,7 @@ export async function POST(req: Request) {
                 .select("id")
                 .eq("user_id", user.id)
                 .maybeSingle();
-            
+
             if (!teacher) {
                 return NextResponse.json({ error: "Teacher profile not found" }, { status: 400 });
             }
@@ -175,7 +175,7 @@ export async function POST(req: Request) {
             for (const section of curriculum) {
                 for (const lesson of section.lessons) {
                     // Use scheduledAt from lesson if provided, otherwise use current time as placeholder
-                    const scheduledAt = lesson.scheduledAt 
+                    const scheduledAt = lesson.scheduledAt
                         ? new Date(lesson.scheduledAt).toISOString()
                         : new Date().toISOString();
 
@@ -222,7 +222,7 @@ export async function POST(req: Request) {
                             const { error: assignError } = await supabase
                                 .from("assignment_students")
                                 .insert(assignmentStudents);
-                            
+
                             if (assignError) {
                                 console.error("Failed to assign students to assignment:", assignError);
                             }
@@ -255,7 +255,7 @@ export async function POST(req: Request) {
                             const { error: quizAssignError } = await supabase
                                 .from("quiz_students")
                                 .insert(quizStudents);
-                            
+
                             if (quizAssignError) {
                                 console.error("Failed to assign students to quiz:", quizAssignError);
                             }

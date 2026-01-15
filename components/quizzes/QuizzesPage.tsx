@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
     Plus,
     Search,
@@ -179,6 +180,15 @@ export default function QuizzesPage({ role }: QuizzesPageProps) {
     }, [quizzes, selectedCourse, searchQuery]);
 
     const canCreate = role === "admin" || role === "teacher";
+
+    const searchParams = useSearchParams();
+    const shouldCreate = searchParams.get("create") === "true";
+
+    useEffect(() => {
+        if (shouldCreate) {
+            setCreateOpen(true);
+        }
+    }, [shouldCreate]);
 
     useEffect(() => {
         loadQuizzes();
