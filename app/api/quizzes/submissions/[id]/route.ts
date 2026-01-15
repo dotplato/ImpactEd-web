@@ -7,12 +7,12 @@ const UpdateScoreSchema = z.object({
     score: z.number().min(0),
 });
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (user.role === "student") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const submissionId = params.id;
+    const { id: submissionId } = await params;
     const body = await req.json();
     const parsed = UpdateScoreSchema.safeParse(body);
     if (!parsed.success) {

@@ -360,7 +360,7 @@ export function ChatWindow({ conversation, currentUser, onBack, onMessageSent }:
                                         </div>
                                     ) : (
                                         // If somehow we have an empty message, don't render the bubble but log it
-                                        <div className="hidden">{console.log("Empty message detected:", msg.id)}</div>
+                                        <div className="hidden">{(() => { console.log("Empty message detected:", msg.id); return null; })()}</div>
                                     )}
                                     <span className="text-[10px] text-muted-foreground mt-1 px-1">
                                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

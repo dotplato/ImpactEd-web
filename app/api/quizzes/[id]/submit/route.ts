@@ -12,12 +12,12 @@ const SubmitQuizSchema = z.object({
     })).optional(),
 });
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (user.role !== "student") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const quizId = params.id;
+    const { id: quizId } = await params;
     const body = await req.json();
     console.log("Quiz submission received:", { quizId, attachmentsCount: body.attachments?.length });
 

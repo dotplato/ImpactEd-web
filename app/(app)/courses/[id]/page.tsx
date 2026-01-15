@@ -296,8 +296,7 @@ export default function CourseDetailPage() {
     if (sessions && Array.isArray(sessions)) {
       sessions.forEach(s => {
         if (s) {
-          // Handle both scheduled_at and schedule fields
-          const scheduledAt = s.scheduled_at || s.schedule;
+          const scheduledAt = s.scheduled_at;
           if (scheduledAt) {
             items.push({
               id: s.id,

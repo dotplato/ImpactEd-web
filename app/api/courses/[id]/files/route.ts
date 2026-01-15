@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 
 export async function GET(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const user = await getCurrentUser();
@@ -12,7 +12,7 @@ export async function GET(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const courseId = params.id;
+        const { id: courseId } = await params;
         if (!courseId) {
             return NextResponse.json({ error: "Course ID is required" }, { status: 400 });
         }
@@ -93,7 +93,7 @@ export async function GET(
 
 export async function POST(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const user = await getCurrentUser();
@@ -101,7 +101,7 @@ export async function POST(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const courseId = params.id;
+        const { id: courseId } = await params;
         if (!courseId) {
             return NextResponse.json({ error: "Course ID is required" }, { status: 400 });
         }

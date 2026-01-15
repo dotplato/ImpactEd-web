@@ -14,7 +14,7 @@ const UpdateTeacherSchema = z.object({
 
 export async function PATCH(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const user = await getCurrentUser();
     if (!user || user.role !== "admin") {
@@ -22,7 +22,7 @@ export async function PATCH(
     }
 
     try {
-        const teacherId = params.id;
+        const { id: teacherId } = await params;
         if (!teacherId) {
             return NextResponse.json({ error: "Teacher ID is required" }, { status: 400 });
         }
@@ -91,7 +91,7 @@ export async function PATCH(
 
 export async function DELETE(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const user = await getCurrentUser();
     if (!user || user.role !== "admin") {
@@ -99,7 +99,7 @@ export async function DELETE(
     }
 
     try {
-        const teacherId = params.id;
+        const { id: teacherId } = await params;
         if (!teacherId) {
             return NextResponse.json({ error: "Teacher ID is required" }, { status: 400 });
         }
