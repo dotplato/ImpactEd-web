@@ -301,17 +301,22 @@ export default function SessionsPage({ role }: Props) {
   };
 
   const onJoin = async (id: string) => {
-    const res = await fetch("/api/sessions/join", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId: id }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      // Navigate to placeholder room or show success
-      if (data?.url) window.location.href = data.url;
-    } else {
-      alert(data?.error || "Unable to join session");
+    try {
+      const res = await fetch("/api/sessions/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: id }),
+      });
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : null;
+      if (res.ok && data.url) {
+        // Open Daily.co room URL in new tab
+        window.open(data.url, "_blank", "noopener,noreferrer");
+      } else {
+        alert((data && data.error) || `Unable to join session (${res.status})`);
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to join session");
     }
   };
 

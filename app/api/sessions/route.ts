@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSupabaseServerClient } from "@/lib/db/supabase-server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { NextRequest } from "next/server";
+import { createDailyRoom, deleteDailyRoom } from "@/lib/integrations/daily";
 
 const CreateSchema = z.object({
   title: z.string().optional(),
@@ -21,7 +22,7 @@ export async function GET() {
     if (user.role === "admin") {
       const { data, error } = await supabase
         .from("course_sessions")
-        .select("id, title, scheduled_at, duration_minutes, status, course:courses(id, title), students:session_students(student:students(id, user:users(id, name, email)))")
+        .select("id, title, scheduled_at, duration_minutes, status, daily_room_url, daily_room_id, course:courses(id, title), students:session_students(student:students(id, user:users(id, name, email)))")
         .order("scheduled_at", { ascending: false });
       if (error) throw new Error(error.message);
       // Transform students
@@ -73,7 +74,7 @@ export async function GET() {
     if (!studentId) return NextResponse.json({ sessions: [] });
     const { data, error } = await supabase
       .from("session_students")
-      .select("session:course_sessions(id, title, scheduled_at, duration_minutes, status, course:courses(id, title))")
+      .select("session:course_sessions(id, title, scheduled_at, duration_minutes, status, daily_room_url, daily_room_id, course:courses(id, title))")
       .eq("student_id", studentId);
     if (error) throw new Error(error.message);
     const sessions = (data ?? []).map((row: any) => {
@@ -135,7 +136,19 @@ export async function POST(req: Request) {
       teacherId = (course as any)?.teacher_id ?? null;
     }
 
-    // 1. Insert session
+    // 1. Create Daily.co room (required)
+    const roomTitle = title || `Session - ${new Date(scheduledAt).toLocaleString()}`;
+    const dailyRoom = await createDailyRoom(roomTitle, {
+      max_participants: selectedStudents.length + 5, // students + teacher + admin buffer
+      enable_chat: true,
+      enable_screenshare: true,
+      enable_prejoin_ui: true,
+    });
+    const dailyRoomUrl = dailyRoom.url;
+    // Daily REST uses /rooms/:name for management
+    const dailyRoomName = dailyRoom.name;
+
+    // 2. Insert session with Daily.co room info
     const { data: created, error: insErr } = await supabase.from("course_sessions").insert({
       title: title || null,
       course_id: courseId,
@@ -143,16 +156,39 @@ export async function POST(req: Request) {
       scheduled_at: new Date(scheduledAt).toISOString(),
       duration_minutes: durationMinutes,
       status: "upcoming",
+      daily_room_url: dailyRoomUrl,
+      daily_room_id: dailyRoomName,
     }).select('id').single();
-    if (insErr) throw new Error(insErr.message);
+    
+    if (insErr) {
+      // If session insert fails, try to clean up Daily.co room
+      try {
+        await deleteDailyRoom(dailyRoomName);
+      } catch (cleanupError) {
+        console.error("Failed to cleanup Daily.co room:", cleanupError);
+      }
+      throw new Error(insErr.message);
+    }
+    
     const sessionId = created.id;
-    // 2. Insert session_students
+    
+    // 3. Insert session_students
     if (selectedStudents.length) {
       const rels = selectedStudents.map(studentId => ({ session_id: sessionId, student_id: studentId }));
       const { error: relErr } = await supabase.from("session_students").insert(rels);
-      if (relErr) throw new Error(relErr.message);
+      if (relErr) {
+        // Rollback: delete session and Daily.co room
+        await supabase.from("course_sessions").delete().eq("id", sessionId);
+        try {
+          await deleteDailyRoom(dailyRoomName);
+        } catch (cleanupError) {
+          console.error("Failed to cleanup Daily.co room:", cleanupError);
+        }
+        throw new Error(relErr.message);
+      }
     }
-    return NextResponse.json({ ok: true });
+    
+    return NextResponse.json({ ok: true, dailyRoomUrl });
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
@@ -208,8 +244,26 @@ export async function DELETE(req: NextRequest, { params }: { params: { sessionId
   }
   if (!canDelete) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // Get Daily.co room ID before deleting session
+  const { data: sessionToDelete } = await supabase
+    .from("course_sessions")
+    .select("daily_room_id")
+    .eq("id", sessionId)
+    .maybeSingle();
+  
   const { error: delErr } = await supabase.from("course_sessions").delete().eq("id", sessionId);
   if (delErr) return NextResponse.json({ error: delErr.message }, { status: 400 });
+  
+  // Clean up Daily.co room if it exists
+  if (sessionToDelete?.daily_room_id) {
+    try {
+      await deleteDailyRoom(sessionToDelete.daily_room_id);
+    } catch (cleanupError) {
+      // Log but don't fail - room might already be deleted or expired
+      console.error("Failed to cleanup Daily.co room:", cleanupError);
+    }
+  }
+  
   return NextResponse.json({ ok: true });
 }
 
