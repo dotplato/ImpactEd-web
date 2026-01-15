@@ -812,12 +812,10 @@ export default function CourseDetailPage() {
                 <CalendarDays className="size-4" />
                 <span>Schedule</span>
               </TabsTrigger>
-              {canUploadFiles && (
-                <TabsTrigger value="files" className="gap-2">
-                  <FileText className="size-4" />
-                  <span>Files</span>
-                </TabsTrigger>
-              )}
+              <TabsTrigger value="files" className="gap-2">
+                <FileText className="size-4" />
+                <span>Files</span>
+              </TabsTrigger>
             </TabsList>
 
             {/* Overview Tab */}
@@ -1106,9 +1104,8 @@ export default function CourseDetailPage() {
               )}
             </TabsContent>
 
-            {/* Files Tab */}
-            {canUploadFiles && (
-              <TabsContent value="files" className="space-y-6 mt-6">
+            <TabsContent value="files" className="space-y-6 mt-6">
+              {canUploadFiles && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Upload Files</CardTitle>
@@ -1127,60 +1124,60 @@ export default function CourseDetailPage() {
                     </div>
                   </CardContent>
                 </Card>
+              )}
 
-                {filesLoading ? (
-                  <Card>
-                    <CardContent className="p-12 text-center text-muted-foreground">
-                      Loading files...
-                    </CardContent>
-                  </Card>
-                ) : files.length > 0 ? (
-                  <div className="space-y-3">
-                    {files.map(f => (
-                      <Card key={f.id}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <FileText className="size-5 text-muted-foreground" />
-                              <div>
-                                <div className="font-medium">{f.file_name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {new Date(f.created_at).toLocaleString()}
-                                </div>
+              {filesLoading ? (
+                <Card>
+                  <CardContent className="p-12 text-center text-muted-foreground">
+                    Loading files...
+                  </CardContent>
+                </Card>
+              ) : files.length > 0 ? (
+                <div className="space-y-3">
+                  {files.map(f => (
+                    <Card key={f.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <FileText className="size-5 text-muted-foreground" />
+                            <div>
+                              <div className="font-medium">{f.file_name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(f.created_at).toLocaleString()}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="icon" asChild>
-                                <a href={f.file_path} target="_blank" rel="noreferrer">
-                                  <Download className="size-4" />
-                                </a>
-                              </Button>
-                              {canDeleteFiles && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => onDeleteFile(f.id)}
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              )}
-                            </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="p-12 text-center text-muted-foreground">
-                      <FileText className="size-12 mx-auto mb-4 opacity-50" />
-                      <p>No files uploaded yet.</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            )}
+                          <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="icon" asChild>
+                              <a href={f.file_path} target="_blank" rel="noreferrer">
+                                <Download className="size-4" />
+                              </a>
+                            </Button>
+                            {canDeleteFiles && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onDeleteFile(f.id)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="p-12 text-center text-muted-foreground">
+                    <FileText className="size-12 mx-auto mb-4 opacity-50" />
+                    <p>No files uploaded yet.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
           </Tabs>
         </div>
 

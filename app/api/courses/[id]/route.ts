@@ -8,7 +8,7 @@ export async function GET(
 ) {
     try {
         const user = await getCurrentUser();
-        if (!user || (user.role !== "admin" && user.role !== "teacher")) {
+        if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
@@ -18,6 +18,32 @@ export async function GET(
         }
 
         const supabase = getSupabaseServerClient();
+
+        // Check access based on role
+        if (user.role === "student") {
+            const { data: student } = await supabase
+                .from("students")
+                .select("id")
+                .eq("user_id", user.id)
+                .maybeSingle();
+
+            if (!student) {
+                return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
+            }
+
+            const { data: enrollment } = await supabase
+                .from("course_students")
+                .select("id")
+                .eq("course_id", courseId)
+                .eq("student_id", student.id)
+                .maybeSingle();
+
+            if (!enrollment) {
+                return NextResponse.json({ error: "Unauthorized: Not enrolled in this course" }, { status: 401 });
+            }
+        } else if (user.role !== "admin" && user.role !== "teacher") {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
 
         // Build query
         let query = supabase

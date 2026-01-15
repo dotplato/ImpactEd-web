@@ -19,11 +19,63 @@ const CreateCourseSchema = z.object({
 
 export async function GET() {
     const user = await getCurrentUser();
-    if (!user || (user.role !== "admin" && user.role !== "teacher")) {
+    if (!user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const supabase = getSupabaseServerClient();
+
+    // Students can only see courses they are enrolled in
+    if (user.role === "student") {
+        const { data: student } = await supabase
+            .from("students")
+            .select("id")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (!student) {
+            return NextResponse.json({ courses: [] });
+        }
+
+        const { data: enrollments } = await supabase
+            .from("course_students")
+            .select("course_id")
+            .eq("student_id", student.id);
+
+        const courseIds = (enrollments || []).map(e => e.course_id);
+
+        if (courseIds.length === 0) {
+            return NextResponse.json({ courses: [] });
+        }
+
+        const { data: courses, error } = await supabase
+            .from("courses")
+            .select(`
+                *,
+                teacher:teachers(
+                    id,
+                    user:users(id, name, email, image_url)
+                ),
+                students:course_students(id)
+            `)
+            .in("id", courseIds)
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        const coursesWithCount = (courses || []).map((c: any) => ({
+            ...c,
+            studentCount: Array.isArray(c.students) ? c.students.length : 0,
+        }));
+
+        return NextResponse.json({ courses: coursesWithCount });
+    }
+
+    if (user.role !== "admin" && user.role !== "teacher") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // Teachers can only see their own courses
     if (user.role === "teacher") {
