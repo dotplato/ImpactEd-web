@@ -161,7 +161,7 @@ export default function NewCoursePage() {
       return s;
     }));
     // Auto-expand new lesson to show fields
-    setExpandedLessons(prev => new Set([...prev, newLessonId]));
+    setExpandedLessons(prev => new Set([...Array.from(prev), newLessonId]));
   };
 
   const updateLessonTitle = (sectionId: string, lessonId: string, title: string) => {

@@ -12,12 +12,12 @@ const SubmitAssignmentSchema = z.object({
     })).optional()
 });
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (user.role !== "student") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const assignmentId = params.id;
+    const { id: assignmentId } = await params;
     const body = await req.json();
     const parsed = SubmitAssignmentSchema.safeParse(body);
     if (!parsed.success) {

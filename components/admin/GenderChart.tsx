@@ -24,7 +24,7 @@ export function GenderChart({ male, female }: { male: number; female: number }) 
             cy="50%"
           >
             <PolarAngleAxis type="number" domain={[0, maxVal]} tick={false} angleAxisId={0} />
-            <RadialBar minAngle={15} clockWise={true} background dataKey="value" cornerRadius={10} />
+            <RadialBar background dataKey="value" cornerRadius={10} />
           </RadialBarChart>
         </ResponsiveContainer>
       </div>
